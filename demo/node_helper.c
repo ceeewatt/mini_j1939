@@ -13,7 +13,7 @@ void node_init(
     const char* device = "vcan0";
     const int tick_rate_ms = 10;
 
-    j1939_app_init(node, name, src_addr, device, tick_rate_ms);
+    j1939_app_init(node, name, src_addr, tick_rate_ms, device);
 }
 
 void node_superloop(
@@ -25,7 +25,8 @@ void node_superloop(
 
     printf("Press enter to start\n");
     getchar();
-    printf("Starting...\n");
+    printf("Starting...\n\n");
+    printf("ID        P  SRC   DST   LEN DATA\n");
 
     while (true)
     {

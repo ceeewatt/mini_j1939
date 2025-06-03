@@ -1,117 +1,181 @@
-#include "j1939.h"
+#include "j1939_address_claim.h"
+#include "j1939_private.h"
+
 #include <string.h>
 
-static void
-tx_address_claim(
-    struct J1939* node)
-{
-    struct J1939Msg msg;
-    msg.pgn = J1939_ADDRESS_CLAIMED_PGN;
-    msg.data = (uint8_t*)&node->ac.name;
-    msg.len = 8;
-    msg.src = node->priv.source_address;
-    msg.dst = J1939_ADDR_GLOBAL;
-    msg.pri = J1939_AC_DEFAULT_PRIORITY;
+/* ============================================================================
+ *
+ * Section: Static function prototypes
+ *
+ * ============================================================================
+ */
 
-    j1939_tx(node, &msg);
+static void
+clear_address_table(
+    struct J1939AC* ac);
+
+static void
+cannot_claim_address(
+    struct J1939AC* ac);
+
+/* ============================================================================
+ *
+ * Section: Function definitions
+ *
+ * ============================================================================
+ */
+
+void
+j1939_ac_init(
+    struct J1939AC* ac,
+    int node_idx,
+    struct J1939Name* name,
+    J1939_AC_STARTUP_DELAY_250MS startup_delay,
+    void* startup_delay_param)
+{
+    uint8_t source_address = j1939_get_source_address(ac->node_idx);
+
+    ac->node_idx = node_idx;
+    ac->cannot_claim_address = false;
+    memcpy(&ac->name, name, sizeof(struct J1939Name));
+
+    clear_address_table(ac);
+
+    // Send address claimed message
+    j1939_tx_helper(
+        ac->node_idx,
+        J1939_ADDRESS_CLAIMED_PGN,
+        (uint8_t*)&ac->name,
+        J1939_ADDRESS_CLAIMED_LEN,
+        J1939_ADDR_GLOBAL,
+        J1939_ADDRESS_CLAIMED_PRI);
+
+    // On startup, nodes claiming addresses in the range 0-127 or 248-253 may
+    //  begin their regular network activities immediately. Nodes claiming
+    //  other addresses should wait 250ms to begin.
+    if ((source_address > 127) && (source_address < 248))
+        startup_delay(startup_delay_param);
 }
 
-static bool
-update_address(
-    struct J1939* node)
+bool
+j1939_ac_update_address(
+    struct J1939AC* ac)
 {
-    if (node->ac.addresses_available == 0)
+    if (ac->addresses_available == 0)
         return false;
 
-    // Begin ascending the address table starting from our current address
-    uint_fast8_t new_address;
-    for (int i = 1; i <= (254 - 1); ++i)
-    {
-        new_address = (node->priv.source_address + i) % 254;
+    uint8_t source_address = j1939_get_source_address(ac->node_idx);
+    uint8_t new_address;
 
-        if (node->ac.address_table[new_address] == 0)
+    for (int i = 1; i <= (J1939_AC_MAX_ADDRESSES - 1); ++i)
+    {
+        new_address = (source_address + i) % J1939_AC_MAX_ADDRESSES;
+
+        if (ac->address_table[new_address] == 0)
         {
-            node->priv.source_address = (uint8_t)new_address;
+            j1939_set_source_address(ac->node_idx, new_address);
             return true;
         }
     }
 
+    // This shouldn't happen but just in case
+    ac->addresses_available = 0;
     return false;
-}
-
-static void
-clear_address_table(
-    struct J1939* node)
-{
-    memset(node->ac.address_table, 0, sizeof(node->ac.address_table));
-    node->ac.address_table[node->priv.source_address] = 1;
-    node->ac.addresses_available = 253;
-}
-
-void
-j1939_ac_rx_address_claim_request(
-    struct J1939* node,
-    struct J1939Msg* msg)
-{
-    // Each node in the network should respond to the request for address claim.
-    // This allows us to update our address table.
-    clear_address_table(node);
-    tx_address_claim(node);
 }
 
 void
 j1939_ac_rx_address_claim(
-    struct J1939* node,
+    struct J1939AC* ac,
     struct J1939Msg* msg)
 {
-    struct J1939Name* name = (struct J1939Name*)msg->data;
+    uint8_t source_address = j1939_get_source_address(ac->node_idx);
+    struct J1939Name* received_name = (struct J1939Name*)msg->data;
 
     // If there's an address contention, check the NAME of the other node.
     // If our NAME if higher priority (lower value), we keep our address.
     // Otherwise, attempt to claim another address.
-    if (msg->src == node->priv.source_address)
+    if (msg->src == source_address)
     {
-        if (*((uint64_t*)name) < *((uint64_t*)&node->ac.name))
+        if (*((uint64_t*)received_name) < *((uint64_t*)&ac->name))
         {
-            if (!update_address(node))
-                node->ac.cannot_claim_address = true;
+            j1939_close_transport_protocol_connection(ac->node_idx);
 
-            tx_address_claim(node);
+            if (!j1939_ac_update_address(ac))
+            {
+                cannot_claim_address(ac);
+                return;
+            }
+        }
 
-            // TODO: close any presently open TP connection
-        }
-        else
-        {
-            tx_address_claim(node);
-        }
+        // Send address claimed message
+        j1939_tx_helper(
+            ac->node_idx,
+            J1939_ADDRESS_CLAIMED_PGN,
+            (uint8_t*)&ac->name,
+            J1939_ADDRESS_CLAIMED_LEN,
+            J1939_ADDR_GLOBAL,
+            J1939_ADDRESS_CLAIMED_PRI);
     }
 
     if (msg->src < 254)
     {
-        node->ac.address_table[msg->src] = 1;
-        node->ac.addresses_available--;
+        ac->address_table[msg->src] = 1;
+        ac->addresses_available--;
     }
 }
 
 void
-j1939_ac_init(
-    struct J1939* node,
-    struct J1939Name* name,
-    uint8_t preferred_address,
-    J1939_STARTUP_DELAY_250MS startup_delay,
-    void* startup_delay_param)
+j1939_ac_rx_address_claim_request(
+    struct J1939AC* ac)
 {
-    node->ac.startup_delay = startup_delay;
-    node->ac.startup_delay_param = startup_delay_param;
-    node->priv.source_address = preferred_address;
+    // Each node in the network should respond to the request for address claim.
+    // This allows us to update our address table.
+    clear_address_table(ac);
 
-    clear_address_table(node);
+    // Send address claimed message
+    j1939_tx_helper(
+        ac->node_idx,
+        J1939_ADDRESS_CLAIMED_PGN,
+        (uint8_t*)&ac->name,
+        J1939_ADDRESS_CLAIMED_LEN,
+        J1939_ADDR_GLOBAL,
+        J1939_ADDRESS_CLAIMED_PRI);
+}
 
-    memcpy(&node->ac.name, name, sizeof(struct J1939Name));
-    node->ac.cannot_claim_address = false;
+/* ============================================================================
+ *
+ * Section: Static function definitions
+ *
+ * ============================================================================
+ */
 
-    tx_address_claim(node);
+static void
+clear_address_table(
+    struct J1939AC* ac)
+{
+    uint8_t source_address = j1939_get_source_address(ac->node_idx);
 
-    if ((node->priv.source_address > 127) && (node->priv.source_address < 248))
-        node->ac.startup_delay(node->ac.startup_delay_param);
+    memset(ac->address_table, 0, sizeof(ac->address_table));
+
+    if (source_address < J1939_AC_MAX_ADDRESSES)
+    {
+        ac->address_table[source_address] = 1;
+        ac->addresses_available = J1939_AC_MAX_ADDRESSES - 1;
+    }
+}
+
+static void
+cannot_claim_address(
+    struct J1939AC* ac)
+{
+    j1939_set_source_address(ac->node_idx, J1939_ADDR_NULL);
+    ac->cannot_claim_address = true;
+
+    j1939_tx_helper(
+        ac->node_idx,
+        J1939_CANNOT_CLAIM_ADDRESS_PGN,
+        (uint8_t*)&ac->name,
+        J1939_CANNOT_CLAIM_ADDRESS_LEN,
+        J1939_ADDR_GLOBAL,
+        J1939_CANNOT_CLAIM_ADDRESS_PRI);
 }

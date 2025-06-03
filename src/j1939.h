@@ -1,123 +1,133 @@
 #pragma once
 
+/* ============================================================================
+ * File: j1939.h
+ *
+ * Description: "Public" J1939 interface. The application layer should need
+ *              only to include this header, and create/initialize a separate
+ *              J1939 object for each unique node. The number of unique nodes
+ *              operated by the application (ECU) should be defined by the
+ *              J1939_NODES macro.
+ *              If this library is compiled with the J1939_LISTENER_ONLY_MODE
+ *              option enabled all nodes simply passively listen to the bus,
+ *              meaning that:
+ *              - Every extended CAN frame will be passed to application layer.
+ *              - Nodes will not participate in address claim.
+ *              - Message transmission is disallowed.
+ *              However, CAN 2.0A messages will still be discarded.
+ * ============================================================================
+ */
+
 #include "j1939_define.h"
 
 #include <stdint.h>
 #include <stdbool.h>
 
+/* ============================================================================
+ *
+ * Section: Type definitions
+ *
+ * ============================================================================
+ */
+
 struct J1939CanFrame {
-    uint32_t can_id;
+    uint32_t id;
     uint8_t data[8];
     uint8_t len;
 };
 
 struct J1939Msg {
-    // This represents all the data associated with a complete J1939 message
     uint32_t pgn;
     uint8_t* data;
+    // With transport protocol, payload can be up to 1785 bytes
     uint16_t len;
     uint8_t src;
     uint8_t dst;
     uint8_t pri;
 };
 
-// Returns true if there is a new CAN message to be received, in which case, the message will be placed in the function argument
-typedef bool (*J1939_PHYSICAL_RX)(struct J1939CanFrame*);
+/* ============================================================================
+ * Subsection: Callback functions; implemented by application
+ * ============================================================================
+ */
 
-// Implemented by the user application. The J1939 layer will pass messages to this function for transmission on the CAN bus.
-// Returns true if successful, returns false otherwise.
-typedef bool (*J1939_PHYSICAL_TX)(struct J1939Msg*);
+// Receive a CAN frame from the bus into J1939CanFrame.
+// Return false if there are no CAN frames to receive. Return true otherwise.
+// This function is called at the rate specified by tick_rate_ms.
+// The application must ensure that bit 31 of the CAN ID is set if the frame is
+//  extended.
+typedef bool (*J1939_CAN_RX)(struct J1939CanFrame*);
 
-typedef void (*J1939_APP_RX)(struct J1939Msg*);
+// Transmit a J1939Msg on the bus. Return true if successful, false otherwise.
+typedef bool (*J1939_CAN_TX)(struct J1939Msg*);
 
-typedef void (*J1939_STARTUP_DELAY_250MS)(void*);
+// Receive a complete J1939Msg. This function is used for passing messages from
+//  the J1939 layer to the application.
+typedef void (*J1939_MSG_RX)(struct J1939Msg*);
 
-enum j1939_tp_connection_type {
-    J1939_TP_NONE = 0,
-    J1939_TP_BROADCAST,
-    J1939_TP_P2P
-};
-
+// This function should implement a 250ms blocking delay. It accepts a single
+//  parameter of any type.
+typedef void (*J1939_AC_STARTUP_DELAY_250MS)(void*);
 
 struct J1939 {
-    // This struct represents a single node on the CAN bus
+    // An index given to this node; will be zero if there's just a single node
+    int node_idx;
 
-    struct {
-        uint8_t source_address;
-        int tick_rate_ms;
-        J1939_PHYSICAL_RX physical_rx;
-        J1939_PHYSICAL_TX physical_tx;
-        J1939_APP_RX app_rx;
-    } priv;
+    uint8_t source_address;
 
-    struct {
-        uint8_t buf[J1939_TP_DATA_MAX];
-        int timer_ms;
-        // What kind of connection is active?
-        enum j1939_tp_connection_type connection_type;
-        // Are we the sender or receiver in this connection?
-        bool sender;
-        // This is the sequence number for the next TP.DT (whether sender or receiver)
-        int next_seq;
-        // How many more data bytes to send/receive?
-        int bytes_rem;
-        // The number of packets for this multi-byte message
-        uint8_t num_packets;
+    // The rate in ms at which the update function is called
+    int tick_rate_ms;
 
-        bool received_cts;
+    J1939_CAN_RX can_rx;
+    J1939_CAN_TX can_tx;
+    J1939_MSG_RX j1939_rx;
 
-        // MESSAGE DATA
-        // pgn of the multi-byte message
-        uint32_t pgn;
-        // length of data in bytes
-        uint16_t len;
-        // message destination
-        uint8_t dst;
-        // message priority
-        uint8_t pri;
-        // address of message source
-        uint8_t src;
-    } tp;
-
-    struct {
-        struct J1939Name name;
-        // TODO: remove
-        uint8_t preferred_address;
-        //bool address_claimed;
-        bool cannot_claim_address;
-
-        J1939_STARTUP_DELAY_250MS startup_delay;
-        void* startup_delay_param;
-
-        int_fast8_t address_table[254];
-        uint_fast8_t addresses_available;
-
-        // 
-        int startup_timer;
-    } ac;
+    J1939_AC_STARTUP_DELAY_250MS startup_delay;
+    void* startup_delay_param;
 };
 
-// initialize the J1939 node state variables. Set the tick_rate_ms value, which is how often the user application calls the update function.
+/* ============================================================================
+ *
+ * Section: Function prototypes
+ *
+ * ============================================================================
+ */
+
+// Initialize a device node upon startup. This function should be called after
+//  the CAN bus is up and operational. If the node is initialized without
+//  issue, return true. Otherwise, return false. It is undefined behvavior to
+//  attempt using a device node if that node was not initialized successfully.
+// The J1939Name parameter should be unique and not used by any other node on
+//  the network.
+// Note that, depending on the preferred_address, this function may enter a
+//  250ms blocking delay (via startup_delay parameter). The startup_delay_param
+//  is an optional parameter that will be passed to the startup_delay callback.
 bool
 j1939_init(
     struct J1939* node,
     struct J1939Name* name,
-    J1939_PHYSICAL_RX physical_rx,
-    J1939_PHYSICAL_TX physical_tx,
-    J1939_APP_RX app_rx,
-    J1939_STARTUP_DELAY_250MS startup_delay,
-    void* startup_delay_param,
     uint8_t preferred_address,
-    int tick_rate_ms);
+    int tick_rate_ms,
+    J1939_CAN_RX can_rx,
+    J1939_CAN_TX can_tx,
+    J1939_MSG_RX j1939_rx,
+    J1939_AC_STARTUP_DELAY_250MS startup_delay,
+    void* startup_delay_param);
 
-// This function should be called by the user application at the rate specified by tick_rate_ms. This 
+// Call this function periodically, at the rate specified by the tick_rate_ms
+//  init parameter.
 void
 j1939_update(
     struct J1939* node);
 
-// The user application will create a j1939 msg and pass it to this function, which serves as the top-level interface for sending j1939 messages on the bus.
-// TODO: return value?
-void
+// Transmit a message on the bus, using the can_tx init parameter callback
+//  function. Return true if successful, false otherwise.
+bool
 j1939_tx(
     struct J1939* node,
+    struct J1939Msg* msg);
+
+// Optional helper function for physical layer to derive CAN ID from J1939Msg
+uint32_t
+j1939_msg_to_can_id(
     struct J1939Msg* msg);
