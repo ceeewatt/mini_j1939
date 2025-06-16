@@ -1,10 +1,16 @@
 find_package(Catch2 3 REQUIRED)
 
-add_executable(test_j1939
-    test_j1939.cpp
-    ${MINI_J1939_SRCS}
+set(MINI_J1939_TEST mini_j1939_test)
+
+set(SOURCES
+    test_j1939_private.cpp
 )
 
-target_include_directories(test_j1939 PRIVATE ${MINI_J1939_INCLUDE_DIRS})
-target_compile_definitions(test_j1939 PRIVATE J1939_UNIT_TEST)
-target_link_libraries(test_j1939 PRIVATE Catch2::Catch2WithMain)
+add_executable(${MINI_J1939_TEST}
+    ${SOURCES}
+)
+
+target_link_libraries(${MINI_J1939_TEST} PRIVATE
+    Catch2::Catch2WithMain
+    MiniJ1939::mini_j1939_lib
+)

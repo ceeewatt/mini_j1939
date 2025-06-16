@@ -1,58 +1,39 @@
+#pragma once
+
 #include "j1939.h"
 
-/* j1939.c */
+struct J1939Private {
+    struct J1939* j1939_public;
 
-void
-dispatch(
-    struct J1939* node,
-    struct J1939Msg* msg);
+    // TODO: private data...
 
-/* j1939_transport_protocol.c */
+    // CAN ID fields of the most recently processed CAN frame
+    struct CanIdConverter {
+        uint8_t pri;
+        uint8_t dp;
+        uint8_t pf;
+        uint8_t ps;
+        uint8_t sa;
+        uint32_t pgn;
+    } can_id_converter;
+};
 
-void
-j1939_tp_init(
-    struct J1939* node);
-
-void
-j1939_tp_close_connection(
-    struct J1939* node);
-
-// Attempt to queue a multi-byte message for transmission
+// Returns true if the id represents a broadcast message
+// Otherwise, the id represents a destination-specific frame
+//  in which case, the destintation of the corresponding j1939 message is the
+//  'ps' field.
 bool
-j1939_tp_queue(
+can_id_converter(
+    struct CanIdConverter* converter,
+    uint32_t id);
+
+bool
+can_frame_to_j1939_message(
     struct J1939* node,
+    struct J1939CanFrame* frame,
     struct J1939Msg* msg);
 
-void
-j1939_tp_update(
-    struct J1939* node);
 
-// Receive a Connection Management packet
-void
-j1939_tp_rx_cm(
-    struct J1939* node,
-    struct J1939Msg* msg);
-
-// Recieve a Data Transfer packet
-void
-j1939_tp_rx_dt(
-    struct J1939* node,
-    struct J1939Msg* msg);
-
-/* j1939_address_claim.c */
-
-void
-j1939_ac_init(
-    struct J1939* node,
-    struct J1939Name* name,
-    uint8_t preferred_address,
-    J1939_STARTUP_DELAY_250MS startup_delay,
-    void* startup_delay_param);
-void
-j1939_ac_rx_address_claim(
-    struct J1939* node,
-    struct J1939Msg* msg);
-void
-j1939_ac_rx_address_claim_request(
-    struct J1939* node,
-    struct J1939Msg* msg);
+#ifdef UNIT_TEST
+extern struct J1939Private* p_g_j1939;
+#endif

@@ -1,11 +1,28 @@
+TARGETS=mini_j1939_test
+J1939_NODES=1
+BUILD_DIR=build
+CMAKE_BUILD_TYPE=Debug
+DISABLE_ADDRESS_CLAIM=ON
+DISABLE_TRANSPORT_PROTOCOL=ON
+J1939_DEMO=OFF
+UNIT_TEST=ON
+
 .PHONY: all configure clean
 
 all:
-	cmake --build build --target node1 node2
+	cmake --build ${BUILD_DIR} --target ${TARGETS}
 
 configure:
-	mkdir -p build
-	cmake -S . -B build/ -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DCMAKE_BUILD_TYPE=Debug -DJ1939_DEMO=1 -DJ1939_DISABLE_ADDRESS_CLAIM=1 -DJ1939_DISABLE_TRANSPORT_PROTOCOL=1
+	mkdir -p ${BUILD_DIR}
+	cmake -S . -B ${BUILD_DIR} \
+		-DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
+		-DJ1939_NODES=${J1939_NODES} \
+		-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
+		-DJ1939_DISABLE_ADDRESS_CLAIM=${DISABLE_ADDRESS_CLAIM} \
+		-DJ1939_DISABLE_TRANSPORT_PROTOCOL=${DISABLE_TRANSPORT_PROTOCOL} \
+		-DJ1939_DEMO=${J1939_DEMO} \
+		-DBUILD_TESTING=${UNIT_TEST}
+	if [ ! -L compile_commands.json ]; then ln -s ${BUILD_DIR}/compile_commands.json .; fi
 
 clean:
-	rm -rf build/*
+	rm -rf ${BUILD_DIR}/*

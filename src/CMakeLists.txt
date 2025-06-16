@@ -1,0 +1,54 @@
+set(MINI_J1939_LIB mini_j1939_lib)
+
+option(
+    J1939_DISABLE_ADDRESS_CLAIM
+    "Disable the address claim procedure"
+    OFF)
+option(
+    J1939_DISABLE_TRANSPORT_PROTOCOL
+    "Disable the transport protocol procedure for sending messages with more than 8 bytes of payload"
+    OFF)
+
+set(SOURCES
+    j1939.h
+    j1939_private.c
+    j1939_private.h
+)
+
+if (NOT J1939_NODES)
+    message(FATAL_ERROR "[mini_j1939] Set J1939_NODES to the number of Controller Applications used.")
+endif()
+
+add_library(${MINI_J1939_LIB} STATIC
+    ${SOURCES}
+)
+
+# Make this target visible to other subdirectories through the alias name
+add_library(MiniJ1939::mini_j1939_lib ALIAS ${MINI_J1939_LIB})
+
+target_link_libraries(${MINI_J1939_LIB} PRIVATE m)
+target_include_directories(${MINI_J1939_LIB} PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+target_compile_definitions(${MINI_J1939_LIB} PRIVATE
+    J1939_NODES=${J1939_NODES}
+)
+target_compile_options(${MINI_J1939_LIB} PRIVATE
+    -Wall
+    -Wextra
+    -Werror
+    -Wpedantic
+    -Wfatal-errors
+)
+
+if (${J1939_DISABLE_ADDRESS_CLAIM})
+    message(STATUS "[J1939] Disabling address claim")
+    list(REMOVE_ITEM SOURCES j1939_address_claim.c)
+    target_compile_definitions(${MINI_J1939_LIB} PRIVATE J1939_DISABLE_ADDRESS_CLAIM)
+endif()
+
+if (${J1939_DISABLE_TRANSPORT_PROTOCOL})
+    message(STATUS "[J1939] Disabling transport protocol")
+    list(REMOVE_ITEM SOURCES j1939_transport_protocol.c)
+    target_compile_definitions(${MINI_J1939_LIB} PRIVATE J1939_DISABLE_TRANSPORT_PROTOCOL)
+endif()
