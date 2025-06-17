@@ -4,3 +4,5 @@
 #define J1939_ADDR_NULL   (254)
 
 #define J1939_TP_MAX_PAYLOAD  (255 * 7)
+
+#define J1939_DEFAULT_PRIORITY  (6)

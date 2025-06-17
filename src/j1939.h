@@ -42,3 +42,8 @@ j1939_init(
 void
 j1939_update(
     struct J1939* node);
+
+bool
+j1939_tx(
+    struct J1939* node,
+    struct J1939Msg* msg);

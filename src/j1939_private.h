@@ -6,7 +6,6 @@
 struct J1939Private {
     struct J1939* j1939_public;
 
-    // TODO: private data...
     struct J1939TP tp;
 
     // CAN ID fields of the most recently processed CAN frame
@@ -34,3 +33,8 @@ j1939_can_frame_unpack(
     struct J1939* node,
     struct J1939CanFrame* frame,
     struct J1939Msg* msg);
+
+
+
+extern struct J1939Private g_j1939[];
+

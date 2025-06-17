@@ -4,15 +4,21 @@
 #error "Set J1939_NODES to the number of Controller Applications used"
 #endif
 
-static struct J1939Private g_j1939[J1939_NODES];
+struct J1939Private g_j1939[J1939_NODES];
 
 static void
 dispatch(
     struct J1939* node,
     struct J1939Msg* msg)
 {
+    struct J1939Private* jp = &g_j1939[node->node_idx];
+
     switch (msg->pgn)
     {
+        case J1939_TP_CM_PGN:
+        case J1939_TP_DT_PGN:
+            j1939_tp_dispatch(&jp->tp, msg);
+            break;
         default:
             node->j1939_rx(msg);
             break;
@@ -30,6 +36,8 @@ j1939_init(
 
     node->node_idx = next_idx;
     g_j1939[next_idx].j1939_public = node;
+
+    j1939_tp_init(&g_j1939[next_idx].tp, next_idx);
 
     next_idx++;
     return true;
