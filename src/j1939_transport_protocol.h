@@ -37,3 +37,8 @@ void
 j1939_tp_rx_dt(
     struct J1939TP* tp,
     struct J1939_TP_DT* dt);
+
+void
+j1939_tp_dt_pack(
+    struct J1939TP* tp,
+    struct J1939_TP_DT* dt);
