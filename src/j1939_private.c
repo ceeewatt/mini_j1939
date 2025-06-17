@@ -1,10 +1,23 @@
 #include "j1939_private.h"
 
 #ifndef J1939_NODES
-#error "Set J1939_NODES to the number of Controller Applications used."
+#error "Set J1939_NODES to the number of Controller Applications used"
 #endif
 
 static struct J1939Private g_j1939[J1939_NODES];
+
+static void
+dispatch(
+    struct J1939* node,
+    struct J1939Msg* msg)
+{
+    switch (msg->pgn)
+    {
+        default:
+            node->j1939_rx(msg);
+            break;
+    }
+}
 
 bool
 j1939_init(
@@ -22,8 +35,44 @@ j1939_init(
     return true;
 }
 
+void
+j1939_update(
+    struct J1939* node)
+{
+    struct J1939CanFrame frame;
+    struct J1939Msg msg;
+    uint8_t msg_buf[8];
+    msg.data = msg_buf;
+
+    while (node->can_rx(&frame))
+    {
+        // Sanity check
+        if (frame.len > 8)
+            continue;
+
+        // TODO: pass frames along to application if application sets a config parameter?
+        if (!j1939_can_frame_unpack(node, &frame, &msg))
+            continue;
+
+        // Ignore peer-to-peer messages not addressed to us
+        if ((msg.dst != J1939_ADDR_GLOBAL) && (msg.dst != node->source_address))
+            continue;
+
+        dispatch(node, &msg);
+    }
+}
+
 bool
-can_id_converter(
+j1939_tx(
+    struct J1939* node,
+    struct J1939Msg* msg)
+{
+
+    return node->can_tx(msg);
+}
+
+bool
+j1939_can_id_converter(
     struct CanIdConverter* converter,
     uint32_t id)
 {
@@ -47,8 +96,9 @@ can_id_converter(
     }
 }
 
+// Return true if the CAN frame was successfully copied into the j1939 msg
 bool
-can_frame_to_j1939_message(
+j1939_can_frame_unpack(
     struct J1939* node,
     struct J1939CanFrame* frame,
     struct J1939Msg* msg)
@@ -57,13 +107,9 @@ can_frame_to_j1939_message(
     if (!((frame->id >> 31) & 1))
         return false;
 
-    // Sanity check
-    if (frame->len > 8)
-        return false;
-
     struct J1939Private* jp = &g_j1939[node->node_idx];
 
-    if (can_id_converter(&jp->can_id_converter, frame->id))
+    if (j1939_can_id_converter(&jp->can_id_converter, frame->id))
         msg->dst = J1939_ADDR_GLOBAL;
     else
         msg->dst = jp->can_id_converter.ps;

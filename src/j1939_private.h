@@ -1,11 +1,13 @@
 #pragma once
 
 #include "j1939.h"
+#include "j1939_transport_protocol.h"
 
 struct J1939Private {
     struct J1939* j1939_public;
 
     // TODO: private data...
+    struct J1939TP tp;
 
     // CAN ID fields of the most recently processed CAN frame
     struct CanIdConverter {
@@ -23,17 +25,12 @@ struct J1939Private {
 //  in which case, the destintation of the corresponding j1939 message is the
 //  'ps' field.
 bool
-can_id_converter(
+j1939_can_id_converter(
     struct CanIdConverter* converter,
     uint32_t id);
 
 bool
-can_frame_to_j1939_message(
+j1939_can_frame_unpack(
     struct J1939* node,
     struct J1939CanFrame* frame,
     struct J1939Msg* msg);
-
-
-#ifdef UNIT_TEST
-extern struct J1939Private* p_g_j1939;
-#endif

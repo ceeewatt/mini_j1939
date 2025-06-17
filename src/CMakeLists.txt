@@ -13,6 +13,9 @@ set(SOURCES
     j1939.h
     j1939_private.c
     j1939_private.h
+    j1939_define.h
+    j1939_transport_protocol.h
+    j1939_transport_protocol.c
 )
 
 if (NOT J1939_NODES)

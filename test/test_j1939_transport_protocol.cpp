@@ -1,0 +1,69 @@
+
+
+extern "C" {
+    #include "j1939_transport_protocol.h"
+}
+
+#include <catch2/catch_test_macros.hpp>
+
+TEST_CASE("Data from TP.DT packets are received and added to the buffer", "[j1939_tp_rx_dt]")
+{
+    J1939TP tp;
+    J1939_TP_DT dt;
+
+    SECTION("Sequence numbers must be received in the expected order")
+    {
+        tp.next_seq = 1;
+        tp.bytes_rem = 7;
+        dt.seq = 2;
+
+        //uint8_t sample_data[7] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66 };
+        //std::memcpy(tp.buf, sample_data, sizeof(sample_data));
+
+        j1939_tp_rx_dt(&tp, &dt);
+
+        // The function should return early and thus skip incrementing next_seq
+        REQUIRE(tp.next_seq == 1);
+    }
+    SECTION("The correct number of bytes are copied, depending on the number of bytes remaining")
+    {
+        tp.next_seq = 1;
+        tp.bytes_rem = 8;
+        std::memset(tp.buf, 0, 9);
+
+        dt.seq = 1;
+        uint8_t data1[7] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66 };
+        uint8_t data2[7] = { 0x77, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+
+        std::memcpy(&dt.data0, data1, sizeof(data1));
+        j1939_tp_rx_dt(&tp, &dt);
+
+        REQUIRE(tp.bytes_rem == 1);
+        REQUIRE(tp.next_seq == 2);
+        REQUIRE(std::memcmp(&tp.buf[0], data1, 7) == 0);
+
+        dt.seq = 2;
+        std::memcpy(&dt.data0, data2, sizeof(data2));
+        j1939_tp_rx_dt(&tp, &dt);
+
+        REQUIRE(tp.bytes_rem == 0);
+        REQUIRE(tp.next_seq == 3);
+        REQUIRE(tp.buf[7] == 0x77);
+        REQUIRE(tp.buf[8] == 0x00);
+    }
+    SECTION("Data is copied into the correct buffer location, depending on the packet's sequence number")
+    {
+        tp.next_seq = 255;
+        tp.bytes_rem = 7;
+        std::memset(tp.buf, 0, sizeof(tp.buf));
+
+        dt.seq = 255;
+        uint8_t data[7] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xBA, 0xBE, 0xEE };
+        std::memcpy(&dt.data0, data, sizeof(data));
+
+        j1939_tp_rx_dt(&tp, &dt);
+
+        REQUIRE(tp.bytes_rem == 0);
+        REQUIRE(std::memcmp(&tp.buf[1778], data, sizeof(data)) == 0);
+    }
+}

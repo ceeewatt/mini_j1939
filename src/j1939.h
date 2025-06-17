@@ -1,15 +1,9 @@
 #pragma once
 
+#include "j1939_define.h"
+
 #include <stdint.h>
 #include <stdbool.h>
-
-#define J1939_ADDR_GLOBAL (255)
-
-struct J1939 {
-    // An index given to this node; will be zero if there's just a single node
-    int node_idx;
-    uint8_t source_address;
-};
 
 struct J1939CanFrame {
     uint32_t id;
@@ -27,6 +21,24 @@ struct J1939Msg {
     uint8_t pri;
 };
 
+typedef bool (*J1939_CAN_RX)(struct J1939CanFrame*);
+typedef bool (*J1939_CAN_TX)(struct J1939Msg*);
+typedef void (*J1939_MSG_RX)(struct J1939Msg*);
+
+struct J1939 {
+    // An index given to this node; will be zero if there's just a single node
+    int node_idx;
+    uint8_t source_address;
+
+    J1939_CAN_RX can_rx;
+    J1939_CAN_TX can_tx;
+    J1939_MSG_RX j1939_rx;
+};
+
 bool
 j1939_init(
+    struct J1939* node);
+
+void
+j1939_update(
     struct J1939* node);
