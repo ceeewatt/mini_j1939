@@ -30,6 +30,9 @@ struct J1939 {
     int node_idx;
     uint8_t source_address;
 
+    // The rate in ms at which the update function is called
+    int tick_rate_ms;
+
     J1939_CAN_RX can_rx;
     J1939_CAN_TX can_tx;
     J1939_MSG_RX j1939_rx;
@@ -37,7 +40,11 @@ struct J1939 {
 
 bool
 j1939_init(
-    struct J1939* node);
+    struct J1939* node,
+    int tick_rate_ms,
+    J1939_CAN_RX can_rx,
+    J1939_CAN_TX can_tx,
+    J1939_MSG_RX j1939_rx);
 
 void
 j1939_update(

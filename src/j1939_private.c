@@ -27,7 +27,11 @@ dispatch(
 
 bool
 j1939_init(
-    struct J1939* node)
+    struct J1939* node,
+    int tick_rate_ms,
+    J1939_CAN_RX can_rx,
+    J1939_CAN_TX can_tx,
+    J1939_MSG_RX j1939_rx)
 {
     static int next_idx = 0;
 
@@ -37,7 +41,12 @@ j1939_init(
     node->node_idx = next_idx;
     g_j1939[next_idx].j1939_public = node;
 
-    j1939_tp_init(&g_j1939[next_idx].tp, next_idx);
+    node->tick_rate_ms = tick_rate_ms;
+    node->can_rx = can_rx;
+    node->can_tx = can_tx;
+    node->j1939_rx = j1939_rx;
+
+    j1939_tp_init(&g_j1939[next_idx].tp, next_idx, tick_rate_ms, j1939_rx);
 
     next_idx++;
     return true;

@@ -47,6 +47,13 @@ struct J1939TP {
 
     // The total number of Data Transfer packages that need to be transmitted for a given connection.
     uint8_t num_packages;
+
+    // Used for periodic message transmission and timeout tracking
+    int timer_ms;
+    int tick_rate_ms;
+
+    // This allows the TP layer to pass multi-packet messages directly to application
+    J1939_MSG_RX j1939_rx;
 };
 
 struct __attribute__((packed)) J1939_TP_DT {
@@ -89,10 +96,26 @@ struct __attribute__((packed)) J1939_TP_CM_ABORT {
 #define J1939_TP_CM_CONTROL_BYTE_BAM  (32)
 #define J1939_TP_CM_CONTROL_BYTE_ABORT  (255)
 
+#define J1939_TP_TIMEOUT_TR  (200)
+#define J1939_TP_TIMEOUT_TH  (500)
+#define J1939_TP_TIMEOUT_T1  (750)
+#define J1939_TP_TIMEOUT_T2  (1250)
+#define J1939_TP_TIMEOUT_T3  (1250)
+#define J1939_TP_TIMEOUT_T4  (1050)
+
+// While a connection is open, transmit TP packets at this period (ms)
+#define J1939_TP_TX_PERIOD  (50)
+
 void
 j1939_tp_init(
     struct J1939TP* tp,
-    int node_idx);
+    int node_idx,
+    int tick_rate_ms,
+    J1939_MSG_RX j1939_rx);
+
+void
+j1939_tp_update(
+    struct J1939TP* tp);
 
 void
 j1939_tp_close_connection(
@@ -103,7 +126,8 @@ j1939_tp_dispatch(
     struct J1939TP* tp,
     struct J1939Msg* msg);
 
-void
+// Returns false if the TP.DT packet couldn't be received successfully
+bool
 j1939_tp_rx_dt(
     struct J1939TP* tp,
     struct J1939_TP_DT* dt);
