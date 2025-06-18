@@ -1,5 +1,3 @@
-
-
 extern "C" {
     #include "j1939_transport_protocol.h"
 }

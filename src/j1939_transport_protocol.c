@@ -50,7 +50,6 @@ broadcast_update(
             if (tp->timer_ms >= J1939_TP_TX_PERIOD)
             {
                 struct J1939_TP_DT dt;
-
                 j1939_tp_dt_pack(tp, &dt);
                 tp_tx(
                     tp,
@@ -68,7 +67,6 @@ broadcast_update(
     }
     else
     {
-        // TODO: update timer value when we receive TP.DT packets
         if (tp->timer_ms >= J1939_TP_TIMEOUT_T1)
         {
             timeout(tp);
@@ -85,7 +83,72 @@ static void
 p2p_update(
     struct J1939TP* tp)
 {
-    (void)tp;
+    if (tp->sender)
+    {
+        // TODO: set clear_to_send = true when we receive a CTS
+        if (tp->clear_to_send)
+        {
+            if (tp->bytes_rem)
+            {
+                if (tp->timer_ms >= J1939_TP_TX_PERIOD)
+                {
+                    struct J1939_TP_DT dt;
+                    j1939_tp_dt_pack(tp, &dt);
+                    tp_tx(
+                        tp,
+                        J1939_TP_DT_PGN,
+                        (uint8_t*)&dt,
+                        J1939_TP_DT_LEN,
+                        // TODO: send this to the address of the receiver node
+                        //  whenever a p2p connection is opened (by j1939_tx()), we need to save the msg.dst into tp.receiver_address
+                        tp->receiver_address,
+                        J1939_TP_DT_PRI);
+                }
+            }
+            else
+            {
+                if (tp->timer_ms >= J1939_TP_TIMEOUT_T3)
+                    timeout(tp);
+            }
+        }
+        else
+        {
+            if (tp->timer_ms >= J1939_TP_TIMEOUT_TR)
+                timeout(tp);
+        }
+    }
+    else
+    {
+        if (!tp->clear_to_send)
+        {
+            if (tp->timer_ms >= J1939_TP_TX_PERIOD)
+            {
+                // TODO
+                // send CTS
+                // tp->clear_to_send = true;
+            }
+        }
+        else
+        {
+            if (tp->timer_ms >= J1939_TP_TIMEOUT_T1)
+            {
+                timeout(tp);
+            }
+            else if (tp->bytes_rem == 0)
+            {
+                struct J1939_TP_CM_ACK ack;
+                j1939_tp_ack_pack(tp, &ack);
+                tp_tx(
+                    tp,
+                    J1939_TP_CM_PGN,
+                    (uint8_t*)&ack,
+                    J1939_TP_CM_LEN,
+                    tp->msg_info.src,
+                    J1939_TP_CM_PRI);
+                j1939_tp_close_connection(tp);
+            }
+        }
+    }
 }
 
 void
@@ -155,6 +218,8 @@ j1939_tp_dispatch(
         switch (control_byte)
         {
         case J1939_TP_CM_CONTROL_BYTE_RTS:
+            // TODO: make sure we save the source address of the node sending the RTS
+                // msg_info.src
             break;
         case J1939_TP_CM_CONTROL_BYTE_CTS:
             break;
@@ -253,6 +318,37 @@ j1939_tp_rx_bam(
 }
 
 void
+j1939_tp_rx_rts(
+    struct J1939TP* tp,
+    struct J1939_TP_CM_BAM* bam,
+    uint8_t msg_src)
+{
+    // TODO: after we receive an RTS, we need to reply with a CTS message
+    // send CTS immediately?
+
+
+    struct J1939Private* jp = &g_j1939[tp->node_idx];
+
+    tp->connection = J1939_TP_CONNECTION_P2P;
+    tp->sender = false;
+
+    tp->next_seq = 1;
+    tp->bytes_rem = bam->len;
+    tp->num_packages = bam->num_packages;
+
+    tp->msg_info.pgn = bam->pgn;
+    tp->msg_info.len = bam->len;
+    tp->msg_info.src = msg_src;
+    tp->msg_info.dst = jp->j1939_public->source_address;
+
+    // TODO: pgn lookup to determine priority
+    tp->msg_info.pri = J1939_DEFAULT_PRIORITY;
+
+    // CTS message will be sent in update loop
+    tp->clear_to_send = false;
+}
+
+void
 j1939_tp_abort_pack(
     struct J1939TP* tp,
     struct J1939_TP_CM_ABORT* abort,
@@ -286,4 +382,16 @@ j1939_tp_bam_pack(
     bam->num_packages = tp->num_packages;
     bam->res = 0xFF;
     bam->pgn = tp->msg_info.pgn;
+}
+
+void
+j1939_tp_ack_pack(
+    struct J1939TP* tp,
+    struct J1939_TP_CM_ACK* ack)
+{
+    ack->control_byte = J1939_TP_CM_CONTROL_BYTE_ACK;
+    ack->len = tp->msg_info.len;
+    ack->num_packages = tp->num_packages;
+    ack->res = 0xFF;
+    ack->pgn = tp->msg_info.pgn;
 }

@@ -24,6 +24,11 @@ struct J1939TP {
     uint8_t buf[J1939_TP_MAX_PAYLOAD];
 
     // This is the multi-packet message that our connection is currently forming
+    // This is used by the receiver.
+    // msg_info.src: the source address of the node that opened the connection
+    // msg_info.dst:
+    //  - for BAM messages: global address (255)
+    //  - for P2P messages: our own source address
     struct J1939Msg msg_info;
 
     // Used to indicate what kind of connection is currently active (broadcast or peer-to-peer).
@@ -54,6 +59,15 @@ struct J1939TP {
 
     // This allows the TP layer to pass multi-packet messages directly to application
     J1939_MSG_RX j1939_rx;
+
+    // Used for P2P connections
+    // Sender: we have received a CTS message from receiver and thus can begin data transfer
+    // Receiver: we have recieved an RTS message and replied with a CTS message, thus, we're ready to begin receiving data
+    bool clear_to_send;
+
+    // This is used by the sender during p2p connections.
+    // This is the address that TP.DT and TP.CM messages are sent to.
+    uint8_t receiver_address;
 };
 
 struct __attribute__((packed)) J1939_TP_DT {
@@ -71,6 +85,27 @@ struct __attribute__((packed)) J1939_TP_DT {
 #define J1939_TP_DT_LEN  (8)
 #define J1939_TP_DT_PRI  (7)
 
+struct __attribute__((packed)) J1939_TP_CM_RTS {
+    uint8_t control_byte;
+    uint16_t len;
+    uint8_t num_packages;
+    uint8_t max_packages;
+    uint32_t pgn : 24;
+};
+struct __attribute__((packed)) J1939_TP_CM_CTS {
+    uint8_t control_byte;
+    uint8_t num_packages;
+    uint8_t next_seq;
+    uint16_t res;
+    uint32_t pgn : 24;
+};
+struct __attribute__((packed)) J1939_TP_CM_ACK {
+    uint8_t control_byte;
+    uint16_t len;
+    uint8_t num_packages;
+    uint8_t res;
+    uint32_t pgn : 24;
+};
 struct __attribute__((packed)) J1939_TP_CM_BAM {
     uint8_t control_byte;
     uint16_t len;
@@ -78,14 +113,12 @@ struct __attribute__((packed)) J1939_TP_CM_BAM {
     uint8_t res;
     uint32_t pgn : 24;
 };
-
 struct __attribute__((packed)) J1939_TP_CM_ABORT {
     uint8_t control_byte;
     uint8_t abort_reason;
     uint32_t res : 24;
     uint32_t pgn : 24;
 };
-
 #define J1939_TP_CM_PGN  (0x00EC00)
 #define J1939_TP_CM_LEN  (8)
 #define J1939_TP_CM_PRI  (7)
@@ -159,3 +192,8 @@ void
 j1939_tp_rx_abort(
     struct J1939TP* tp,
     struct J1939_TP_CM_ABORT* abort);
+
+void
+j1939_tp_ack_pack(
+    struct J1939TP* tp,
+    struct J1939_TP_CM_ACK* ack);
