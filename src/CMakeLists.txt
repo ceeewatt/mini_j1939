@@ -16,6 +16,8 @@ set(SOURCES
     j1939_define.h
     j1939_transport_protocol.h
     j1939_transport_protocol.c
+    j1939_transport_protocol_helper.c
+    j1939_transport_protocol_helper.h
 )
 
 if (NOT J1939_NODES)
@@ -29,7 +31,6 @@ add_library(${MINI_J1939_LIB} STATIC
 # Make this target visible to other subdirectories through the alias name
 add_library(MiniJ1939::mini_j1939_lib ALIAS ${MINI_J1939_LIB})
 
-target_link_libraries(${MINI_J1939_LIB} PRIVATE m)
 target_include_directories(${MINI_J1939_LIB} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )

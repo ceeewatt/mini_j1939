@@ -84,8 +84,15 @@ j1939_tx(
     struct J1939* node,
     struct J1939Msg* msg)
 {
-
-    return node->can_tx(msg);
+    if (msg->len > 8)
+    {
+        struct J1939Private* jp = &g_j1939[node->node_idx];
+        return j1939_tp_queue(&jp->tp, msg);
+    }
+    else
+    {
+        return node->can_tx(msg);
+    }
 }
 
 bool

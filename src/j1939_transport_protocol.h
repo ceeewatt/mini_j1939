@@ -64,10 +64,6 @@ struct J1939TP {
     // Sender: we have received a CTS message from receiver and thus can begin data transfer
     // Receiver: we have recieved an RTS message and replied with a CTS message, thus, we're ready to begin receiving data
     bool clear_to_send;
-
-    // This is used by the sender during p2p connections.
-    // This is the address that TP.DT and TP.CM messages are sent to.
-    uint8_t receiver_address;
 };
 
 struct __attribute__((packed)) J1939_TP_DT {
@@ -139,12 +135,20 @@ struct __attribute__((packed)) J1939_TP_CM_ABORT {
 // While a connection is open, transmit TP packets at this period (ms)
 #define J1939_TP_TX_PERIOD  (50)
 
+// No limit on the number of packages sent during a P2P connection
+#define J1939_TP_CM_RTS_MAX_PACKAGES  (0xFF)
+
 void
 j1939_tp_init(
     struct J1939TP* tp,
     int node_idx,
     int tick_rate_ms,
     J1939_MSG_RX j1939_rx);
+
+bool
+j1939_tp_queue(
+    struct J1939TP* tp,
+    struct J1939Msg* msg);
 
 void
 j1939_tp_update(
@@ -158,42 +162,3 @@ void
 j1939_tp_dispatch(
     struct J1939TP* tp,
     struct J1939Msg* msg);
-
-// Returns false if the TP.DT packet couldn't be received successfully
-bool
-j1939_tp_rx_dt(
-    struct J1939TP* tp,
-    struct J1939_TP_DT* dt);
-
-void
-j1939_tp_dt_pack(
-    struct J1939TP* tp,
-    struct J1939_TP_DT* dt);
-
-void
-j1939_tp_rx_bam(
-    struct J1939TP* tp,
-    struct J1939_TP_CM_BAM* bam,
-    uint8_t msg_src);
-
-void
-j1939_tp_bam_pack(
-    struct J1939TP* tp,
-    struct J1939_TP_CM_BAM* bam);
-
-void
-j1939_tp_abort_pack(
-    struct J1939TP* tp,
-    struct J1939_TP_CM_ABORT* abort,
-    enum j1939_tp_abort_reason reason,
-    uint32_t pgn);
-
-void
-j1939_tp_rx_abort(
-    struct J1939TP* tp,
-    struct J1939_TP_CM_ABORT* abort);
-
-void
-j1939_tp_ack_pack(
-    struct J1939TP* tp,
-    struct J1939_TP_CM_ACK* ack);

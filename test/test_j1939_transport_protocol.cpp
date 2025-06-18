@@ -1,5 +1,5 @@
 extern "C" {
-    #include "j1939_transport_protocol.h"
+    #include "j1939_transport_protocol_helper.h"
 }
 
 #include <catch2/catch_test_macros.hpp>
