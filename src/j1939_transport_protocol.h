@@ -68,9 +68,6 @@ struct J1939TP {
     int timer_ms;
     int tick_rate_ms;
 
-    // Used to pass the received multi-packet messages to the application
-    J1939_MSG_RX j1939_rx;
-
     // Used for P2P connections to signal when we're ready for data transfer.
     // Sender: we've received a CTS msg and can begin transmitting data.
     // Receiver: we've responded to an RTS with a CTS and are ready for data.
@@ -160,8 +157,7 @@ void
 j1939_tp_init(
     struct J1939TP* tp,
     int node_idx,
-    int tick_rate_ms,
-    J1939_MSG_RX j1939_rx);
+    int tick_rate_ms);
 
 // Attempt to queue up a multi-packet message for transmission. Return true if
 //  successful, return false otherwise.

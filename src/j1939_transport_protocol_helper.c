@@ -8,6 +8,11 @@
  * ============================================================================
  */
 
+// Pass the fully received message to the application
+static void
+forward_msg(
+    struct J1939TP* tp);
+
 static void
 timeout(
     struct J1939TP* tp);
@@ -91,6 +96,7 @@ broadcast_update_sender(
                 J1939_TP_DT_LEN,
                 tp->msg_info.dst,
                 J1939_TP_DT_PRI);
+            tp->timer_ms = 0;
         }
     }
     else
@@ -118,6 +124,7 @@ p2p_update_sender(
                     J1939_TP_DT_LEN,
                     tp->msg_info.dst,
                     J1939_TP_DT_PRI);
+                tp->timer_ms = 0;
             }
         }
         else
@@ -219,7 +226,7 @@ broadcast_update_receiver(
     }
     else if (tp->bytes_rem == 0)
     {
-        tp->j1939_rx(&tp->msg_info);
+        forward_msg(tp);
         j1939_tp_close_connection(tp);
     }
 }
@@ -241,6 +248,7 @@ p2p_update_receiver(
                 J1939_TP_CM_LEN,
                 tp->msg_info.src,
                 J1939_TP_CM_PRI);
+            tp->timer_ms = 0;
             tp->clear_to_send = true;
         }
     }
@@ -262,7 +270,7 @@ p2p_update_receiver(
                 tp->msg_info.src,
                 J1939_TP_CM_PRI);
 
-            tp->j1939_rx(&tp->msg_info);
+            forward_msg(tp);
             j1939_tp_close_connection(tp);
         }
     }
@@ -368,6 +376,15 @@ j1939_tp_rx_bam(
  *
  * ============================================================================
  */
+
+static void
+forward_msg(
+    struct J1939TP* tp)
+{
+    struct J1939Private* jp = &g_j1939[tp->node_idx];
+
+    jp->j1939_public->j1939_rx(&tp->msg_info);
+}
 
 static void
 timeout(

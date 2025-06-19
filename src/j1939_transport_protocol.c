@@ -34,15 +34,13 @@ void
 j1939_tp_init(
     struct J1939TP* tp,
     int node_idx,
-    int tick_rate_ms,
-    J1939_MSG_RX j1939_rx)
+    int tick_rate_ms)
 {
     tp->node_idx = node_idx;
 
     tp->connection = J1939_TP_CONNECTION_NONE;
     tp->msg_info.data = tp->buf;
     tp->tick_rate_ms = tick_rate_ms;
-    tp->j1939_rx = j1939_rx;
 }
 
 bool

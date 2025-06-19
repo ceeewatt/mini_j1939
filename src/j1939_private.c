@@ -49,7 +49,7 @@ j1939_init(
     node->j1939_rx = j1939_rx;
 
     // TODO: we shouldn't need to pass j1939_rx to TP
-    j1939_tp_init(&g_j1939[next_idx].tp, next_idx, tick_rate_ms, j1939_rx);
+    j1939_tp_init(&g_j1939[next_idx].tp, next_idx, tick_rate_ms);
 
     next_idx++;
     return true;

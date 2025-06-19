@@ -102,50 +102,171 @@ TEST_CASE("Data in the buffer is packed properly into TP.DT packets", "[j1939_tp
     }
 }
 
-TEST_CASE("Opening a connection results in the sender transmitting the appropriate TP message", "[j1939_tp_queue]")
+TEST_CASE("Broadcast sender", "[j1939_tp_queue][broadcast_update_sender]")
 {
     J1939Private* jp = &g_j1939[TestJ1939::node.node_idx];
     J1939Msg msg;
 
-    SECTION("Sender cannot open a new connection while one is already active")
-    {
-        jp->tp.connection = J1939_TP_CONNECTION_BROADCAST;
-        REQUIRE(j1939_tp_queue(&jp->tp, &msg) == false);
+    uint8_t data[15] = {
+        0x5a, 0x62, 0x38, 0xd8, 0x03, 0xd1, 0x40,
+        0x73, 0xc5, 0xa7, 0xc7, 0x83, 0x04, 0xd2,
+        0x88
+    };
+    msg.pgn = 0xABCD;
+    msg.data = data;
+    msg.len = sizeof(data);
+    msg.dst = J1939_ADDR_GLOBAL;
+    msg.pri = J1939_DEFAULT_PRIORITY;
 
-        jp->tp.connection = J1939_TP_CONNECTION_P2P;
-        REQUIRE(j1939_tp_queue(&jp->tp, &msg) == false);
+    // Send BAM
+    j1939_tp_close_connection(&jp->tp);
+    bool result = j1939_tp_queue(&jp->tp, &msg);
+
+    REQUIRE(result == true);
+    REQUIRE(std::memcmp(jp->tp.buf, data, sizeof(data)) == 0);
+    REQUIRE(jp->tp.connection == J1939_TP_CONNECTION_BROADCAST);
+    REQUIRE(jp->tp.bytes_rem == 15);
+    REQUIRE(TestJ1939::msg.pgn == J1939_TP_CM_PGN);
+    REQUIRE(TestJ1939::msg.len == J1939_TP_CM_LEN);
+    REQUIRE(TestJ1939::msg.pri == J1939_TP_CM_PRI);
+    REQUIRE(TestJ1939::msg.dst == J1939_ADDR_GLOBAL);
+    REQUIRE(TestJ1939::msg.src == jp->j1939_public->source_address);
+
+    J1939_TP_CM_BAM* bam = (J1939_TP_CM_BAM*)TestJ1939::msg.data;
+    REQUIRE(bam->control_byte == J1939_TP_CM_CONTROL_BYTE_BAM);
+    REQUIRE(bam->len == sizeof(data));
+    REQUIRE(bam->num_packages == 3);
+    REQUIRE(bam->pgn == 0xABCD);
+
+    // Send first TP.DT packet
+    jp->tp.timer_ms = J1939_TP_TX_PERIOD;
+    broadcast_update_sender(&jp->tp);
+    J1939_TP_DT* dt = (J1939_TP_DT*)TestJ1939::msg.data;
+
+    REQUIRE(TestJ1939::msg.pgn == J1939_TP_DT_PGN);
+    REQUIRE(TestJ1939::msg.len == J1939_TP_DT_LEN);
+    REQUIRE(TestJ1939::msg.pri == J1939_TP_DT_PRI);
+    REQUIRE(TestJ1939::msg.dst == J1939_ADDR_GLOBAL);
+    REQUIRE(TestJ1939::msg.src == jp->j1939_public->source_address);
+    REQUIRE(dt->seq == 1);
+    REQUIRE(std::memcmp(&dt->data0, &data[0], 7) == 0);
+    REQUIRE(jp->tp.bytes_rem == 8);
+
+    // Send second TP.DT packet
+    jp->tp.timer_ms = J1939_TP_TX_PERIOD;
+    broadcast_update_sender(&jp->tp);
+
+    REQUIRE(dt->seq == 2);
+    REQUIRE(std::memcmp(&dt->data0, &data[7], 7) == 0);
+    REQUIRE(jp->tp.bytes_rem == 1);
+
+    // Send third TP.DT packet
+    jp->tp.timer_ms = J1939_TP_TX_PERIOD;
+    broadcast_update_sender(&jp->tp);
+
+    REQUIRE(dt->seq == 3);
+    REQUIRE(dt->data0 == data[14]);
+    REQUIRE(jp->tp.bytes_rem == 0);
+
+    // Connection should now close
+    broadcast_update_sender(&jp->tp);
+    REQUIRE(jp->tp.connection == J1939_TP_CONNECTION_NONE);
+}
+
+TEST_CASE("Broadcast reciever", "[broadcast_update_receiver]")
+{
+    // Emulate receiving the multi-byte packet from a sender node
+
+    constexpr uint8_t sender_node_address = 0x99;
+    constexpr uint32_t msg_pgn = 0xABCD;
+
+    J1939Private* jp = &g_j1939[TestJ1939::node.node_idx];
+    j1939_tp_close_connection(&jp->tp);
+
+    uint8_t msg_data[15] = {
+        0x5a, 0x62, 0x38, 0xd8, 0x03, 0xd1, 0x40,
+        0x73, 0xc5, 0xa7, 0xc7, 0x83, 0x04, 0xd2,
+        0x88
+    };
+    J1939Msg msg { 
+        .pgn = msg_pgn,
+        .data = msg_data,
+        .len = sizeof(msg_data),
+        .src = sender_node_address,
+        .dst = J1939_ADDR_GLOBAL,
+        .pri = J1939_DEFAULT_PRIORITY
+    };
+
+    J1939_TP_CM_BAM bam {
+        .control_byte = J1939_TP_CM_CONTROL_BYTE_BAM,
+        .len = sizeof(msg_data),
+        .num_packages = 3,
+        .res = 0xFF,
+        .pgn = msg_pgn
+    };
+    J1939Msg bam_msg {
+        .pgn = J1939_TP_CM_PGN,
+        .data = (uint8_t*)&bam,
+        .len = J1939_TP_CM_LEN,
+        .src = sender_node_address,
+        .dst = J1939_ADDR_GLOBAL,
+        .pri = J1939_TP_CM_PRI
+    };
+
+    // Emulate receiving the BAM message
+    j1939_tp_dispatch(&jp->tp, &bam_msg);
+
+    SECTION("Timeout")
+    {
+        jp->tp.timer_ms = J1939_TP_TIMEOUT_T1;
+        broadcast_update_receiver(&jp->tp);
+
+        REQUIRE(jp->tp.connection == J1939_TP_CONNECTION_NONE);
     }
-    SECTION("Broadcast message results in BAM message transmission")
+    SECTION("Normal data transfer")
     {
-        uint8_t data[15] = {
-            0x5a, 0x62, 0x38, 0xd8, 0x03, 0xd1, 0x40,
-            0x73, 0xc5, 0xa7, 0xc7, 0x83, 0x04, 0xd2,
-            0x88
-        };
-        msg.pgn = 0xABCD;
-        msg.data = data;
-        msg.len = sizeof(data);
-        msg.dst = J1939_ADDR_GLOBAL;
-        msg.pri = J1939_DEFAULT_PRIORITY;
-
-        j1939_tp_close_connection(&jp->tp);
-        bool result = j1939_tp_queue(&jp->tp, &msg);
-
-        REQUIRE(result == true);
-        REQUIRE(std::memcmp(jp->tp.buf, data, sizeof(data)) == 0);
         REQUIRE(jp->tp.connection == J1939_TP_CONNECTION_BROADCAST);
+        REQUIRE(jp->tp.sender == false);
+        REQUIRE(jp->tp.next_seq == 1);
+        REQUIRE(jp->tp.bytes_rem == sizeof(msg_data));
+        REQUIRE(jp->tp.num_packages == 3);
 
-        REQUIRE(TestJ1939::msg.pgn == J1939_TP_CM_PGN);
-        REQUIRE(TestJ1939::msg.len == J1939_TP_CM_LEN);
-        REQUIRE(TestJ1939::msg.pri == J1939_TP_CM_PRI);
-        REQUIRE(TestJ1939::msg.dst == J1939_ADDR_GLOBAL);
-        REQUIRE(TestJ1939::msg.src == jp->j1939_public->source_address);
+        J1939Msg dt_msg {
+            .pgn = J1939_TP_DT_PGN,
+            .data = nullptr,
+            .len = J1939_TP_DT_LEN,
+            .src = sender_node_address,
+            .dst = J1939_ADDR_GLOBAL,
+            .pri = J1939_TP_DT_PRI
+        };
 
-        J1939_TP_CM_BAM* bam = (J1939_TP_CM_BAM*)TestJ1939::msg.data;
+        jp->tp.timer_ms = 0;
 
-        REQUIRE(bam->control_byte == J1939_TP_CM_CONTROL_BYTE_BAM);
-        REQUIRE(bam->len == sizeof(data));
-        REQUIRE(bam->num_packages == 3);
-        REQUIRE(bam->pgn == 0xABCD);
+        // Emulate receiving the first TP.DT packet
+        J1939_TP_DT dt { .seq = 1 };
+        std::memcpy(&dt.data0, msg_data, 7);
+        dt_msg.data = (uint8_t*)&dt;
+        j1939_tp_dispatch(&jp->tp, &dt_msg);
+
+        // Emulate receiving the second TP.DT packet
+        dt.seq = 2;
+        std::memcpy(&dt.data0, &msg_data[7], 7);
+        j1939_tp_dispatch(&jp->tp, &dt_msg);
+        
+        // Emulate receiving the third TP.DT packet
+        dt.seq = 3;
+        dt.data0 = msg_data[14];
+        j1939_tp_dispatch(&jp->tp, &dt_msg);
+
+        broadcast_update_receiver(&jp->tp);
+
+        REQUIRE(jp->tp.bytes_rem == 0);
+        REQUIRE(jp->tp.connection == J1939_TP_CONNECTION_NONE);
+        REQUIRE(jp->tp.msg_info.pgn == msg_pgn);
+        REQUIRE(jp->tp.msg_info.dst == J1939_ADDR_GLOBAL);
+        REQUIRE(jp->tp.msg_info.len == sizeof(msg_data));
+        REQUIRE(jp->tp.msg_info.src == sender_node_address);
+        REQUIRE(jp->tp.msg_info.pri == J1939_DEFAULT_PRIORITY);
+        REQUIRE(std::memcmp(jp->tp.buf, TestJ1939::msg.data, sizeof(msg_data)) == 0);
     }
 }

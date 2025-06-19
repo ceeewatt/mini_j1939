@@ -25,7 +25,8 @@ public:
     static J1939Msg msg;
     static uint8_t msg_buf[J1939_TP_MAX_PAYLOAD];
 
-    static bool can_tx(J1939Msg* foo);
+    static bool can_tx(J1939Msg* msg);
+    static void j1939_rx(J1939Msg* msg);
     // TODO: other callbacks
 
     using Catch::EventListenerBase::EventListenerBase;
