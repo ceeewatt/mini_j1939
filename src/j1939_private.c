@@ -15,19 +15,20 @@ dispatch(
 
     switch (msg->pgn)
     {
-        case J1939_TP_CM_PGN:
-        case J1939_TP_DT_PGN:
-            j1939_tp_dispatch(&jp->tp, msg);
-            break;
-        default:
-            node->j1939_rx(msg);
-            break;
+    case J1939_TP_CM_PGN:
+    case J1939_TP_DT_PGN:
+        j1939_tp_dispatch(&jp->tp, msg);
+        break;
+    default:
+        node->j1939_rx(msg);
+        break;
     }
 }
 
 bool
 j1939_init(
     struct J1939* node,
+    uint8_t preferred_address,
     int tick_rate_ms,
     J1939_CAN_RX can_rx,
     J1939_CAN_TX can_tx,
@@ -41,11 +42,13 @@ j1939_init(
     node->node_idx = next_idx;
     g_j1939[next_idx].j1939_public = node;
 
+    node->source_address = preferred_address;
     node->tick_rate_ms = tick_rate_ms;
     node->can_rx = can_rx;
     node->can_tx = can_tx;
     node->j1939_rx = j1939_rx;
 
+    // TODO: we shouldn't need to pass j1939_rx to TP
     j1939_tp_init(&g_j1939[next_idx].tp, next_idx, tick_rate_ms, j1939_rx);
 
     next_idx++;
@@ -84,6 +87,9 @@ j1939_tx(
     struct J1939* node,
     struct J1939Msg* msg)
 {
+    // TODO: address claim type
+    msg->src = node->source_address;
+
     if (msg->len > 8)
     {
         struct J1939Private* jp = &g_j1939[node->node_idx];

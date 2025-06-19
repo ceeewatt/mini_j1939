@@ -1,6 +1,4 @@
-extern "C" {
-    #include "j1939_transport_protocol_helper.h"
-}
+#include "test_j1939.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -101,5 +99,53 @@ TEST_CASE("Data in the buffer is packed properly into TP.DT packets", "[j1939_tp
         j1939_tp_dt_pack(&tp, &dt);
 
         REQUIRE(std::memcmp(&dt.data0, expected, sizeof(expected)) == 0);
+    }
+}
+
+TEST_CASE("Opening a connection results in the sender transmitting the appropriate TP message", "[j1939_tp_queue]")
+{
+    J1939Private* jp = &g_j1939[TestJ1939::node.node_idx];
+    J1939Msg msg;
+
+    SECTION("Sender cannot open a new connection while one is already active")
+    {
+        jp->tp.connection = J1939_TP_CONNECTION_BROADCAST;
+        REQUIRE(j1939_tp_queue(&jp->tp, &msg) == false);
+
+        jp->tp.connection = J1939_TP_CONNECTION_P2P;
+        REQUIRE(j1939_tp_queue(&jp->tp, &msg) == false);
+    }
+    SECTION("Broadcast message results in BAM message transmission")
+    {
+        uint8_t data[15] = {
+            0x5a, 0x62, 0x38, 0xd8, 0x03, 0xd1, 0x40,
+            0x73, 0xc5, 0xa7, 0xc7, 0x83, 0x04, 0xd2,
+            0x88
+        };
+        msg.pgn = 0xABCD;
+        msg.data = data;
+        msg.len = sizeof(data);
+        msg.dst = J1939_ADDR_GLOBAL;
+        msg.pri = J1939_DEFAULT_PRIORITY;
+
+        j1939_tp_close_connection(&jp->tp);
+        bool result = j1939_tp_queue(&jp->tp, &msg);
+
+        REQUIRE(result == true);
+        REQUIRE(std::memcmp(jp->tp.buf, data, sizeof(data)) == 0);
+        REQUIRE(jp->tp.connection == J1939_TP_CONNECTION_BROADCAST);
+
+        REQUIRE(TestJ1939::msg.pgn == J1939_TP_CM_PGN);
+        REQUIRE(TestJ1939::msg.len == J1939_TP_CM_LEN);
+        REQUIRE(TestJ1939::msg.pri == J1939_TP_CM_PRI);
+        REQUIRE(TestJ1939::msg.dst == J1939_ADDR_GLOBAL);
+        REQUIRE(TestJ1939::msg.src == jp->j1939_public->source_address);
+
+        J1939_TP_CM_BAM* bam = (J1939_TP_CM_BAM*)TestJ1939::msg.data;
+
+        REQUIRE(bam->control_byte == J1939_TP_CM_CONTROL_BYTE_BAM);
+        REQUIRE(bam->len == sizeof(data));
+        REQUIRE(bam->num_packages == 3);
+        REQUIRE(bam->pgn == 0xABCD);
     }
 }

@@ -16,11 +16,17 @@ extern "C" {
     };
 
     #include "j1939_private.h"
+    #include "j1939_transport_protocol_helper.h"
 }
 
 class TestJ1939 : public Catch::EventListenerBase {
 public:
     static J1939 node;
+    static J1939Msg msg;
+    static uint8_t msg_buf[J1939_TP_MAX_PAYLOAD];
+
+    static bool can_tx(J1939Msg* foo);
+    // TODO: other callbacks
 
     using Catch::EventListenerBase::EventListenerBase;
 

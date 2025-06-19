@@ -1,26 +1,31 @@
 #include "j1939_transport_protocol_helper.h"
 #include "j1939_private.h"
 
-/*=============================================================================
-Section: File-static functions
-=============================================================================*/
+/* ============================================================================
+ *
+ * Section: Static function prototypes
+ *
+ * ============================================================================
+ */
 
 static void
 timeout(
-    struct J1939TP* tp)
-{
-    struct J1939_TP_CM_ABORT abort;
+    struct J1939TP* tp);
 
-    j1939_tp_abort_pack(tp, &abort, J1939_TP_ABORT_REASON_TIMEOUT, tp->msg_info.pgn);
-    j1939_tp_close_connection(tp);
-}
+/* ============================================================================
+ *
+ * Section: Function definitions
+ *
+ * ============================================================================
+ */
 
-/*=============================================================================
-Section: Generic helper functions
-=============================================================================*/
+/* ============================================================================
+ * Subsection: Sender/receiver helper functions
+ * ============================================================================
+ */
 
 void
-tp_tx(
+j1939_tp_tx(
     struct J1939TP* tp,
     uint32_t pgn,
     uint8_t* data,
@@ -40,9 +45,34 @@ tp_tx(
     (void)j1939_tx(jp->j1939_public, &msg);
 }
 
-/*=============================================================================
-Section: Sender helper functions
-=============================================================================*/
+void
+j1939_tp_rx_abort(
+    struct J1939TP* tp,
+    struct J1939_TP_CM_ABORT* abort)
+{
+    if (abort->pgn == tp->msg_info.pgn)
+        j1939_tp_close_connection(tp);
+}
+
+void
+j1939_tp_abort_pack(
+    struct J1939TP* tp,
+    struct J1939_TP_CM_ABORT* abort,
+    enum j1939_tp_abort_reason reason,
+    uint32_t pgn)
+{
+    (void)tp;
+
+    abort->control_byte = J1939_TP_CM_CONTROL_BYTE_ABORT;
+    abort->abort_reason = reason;
+    abort->res = 0xFF;
+    abort->pgn = pgn;
+}
+
+/* ============================================================================
+ * Subsection: Sender helper functions
+ * ============================================================================
+ */
 
 void
 broadcast_update_sender(
@@ -54,7 +84,7 @@ broadcast_update_sender(
         {
             struct J1939_TP_DT dt;
             j1939_tp_dt_pack(tp, &dt);
-            tp_tx(
+            j1939_tp_tx(
                 tp,
                 J1939_TP_DT_PGN,
                 (uint8_t*)&dt,
@@ -81,7 +111,7 @@ p2p_update_sender(
             {
                 struct J1939_TP_DT dt;
                 j1939_tp_dt_pack(tp, &dt);
-                tp_tx(
+                j1939_tp_tx(
                     tp,
                     J1939_TP_DT_PGN,
                     (uint8_t*)&dt,
@@ -138,27 +168,28 @@ void j1939_tp_rts_pack(
     rts->pgn = tp->msg_info.pgn;
 }
 
-void j1939_tp_cts_pack(
+void j1939_tp_rx_cts(
     struct J1939TP* tp,
     struct J1939_TP_CM_CTS* cts)
 {
-    cts->control_byte = J1939_TP_CM_CONTROL_BYTE_CTS;
-    cts->num_packages = tp->num_packages;
-    cts->next_seq = 1;
-    cts->res = 0xFFFF;
-    cts->pgn = tp->msg_info.pgn;
+    // NOTE: the standard defines a method by which the receiver can delay the
+    //  data transmission while keeping the connection open. This is done by
+    //  sending a CTS message, with num_packages set to zero, every 0.5 seconds
+    //  until it's ready to receive the data. I'm choosing not to implement this.
+    //  Thus, when the sender receives a CTS message, it's assumed that the
+    //  receiver is ready to receive all bytes of payload.
+    (void)cts;
+
+    tp->clear_to_send = true;
 }
 
 void
-j1939_tp_ack_pack(
+j1939_tp_rx_ack(
     struct J1939TP* tp,
     struct J1939_TP_CM_ACK* ack)
 {
-    ack->control_byte = J1939_TP_CM_CONTROL_BYTE_ACK;
-    ack->len = tp->msg_info.len;
-    ack->num_packages = tp->num_packages;
-    ack->res = 0xFF;
-    ack->pgn = tp->msg_info.pgn;
+    if (ack->pgn == tp->msg_info.pgn)
+        j1939_tp_close_connection(tp);
 }
 
 void
@@ -173,24 +204,10 @@ j1939_tp_bam_pack(
     bam->pgn = tp->msg_info.pgn;
 }
 
-void
-j1939_tp_abort_pack(
-    struct J1939TP* tp,
-    struct J1939_TP_CM_ABORT* abort,
-    enum j1939_tp_abort_reason reason,
-    uint32_t pgn)
-{
-    (void)tp;
-
-    abort->control_byte = J1939_TP_CM_CONTROL_BYTE_ABORT;
-    abort->abort_reason = reason;
-    abort->res = 0xFF;
-    abort->pgn = pgn;
-}
-
-/*=============================================================================
-Section: Receiver helper functions
-=============================================================================*/
+/* ============================================================================
+ * Subsection: Receiver helper functions
+ * ============================================================================
+ */
 
 void
 broadcast_update_receiver(
@@ -217,7 +234,7 @@ p2p_update_receiver(
         {
             struct J1939_TP_CM_CTS cts;
             j1939_tp_cts_pack(tp, &cts);
-            tp_tx(
+            j1939_tp_tx(
                 tp,
                 J1939_TP_CM_PGN,
                 (uint8_t*)&cts,
@@ -237,13 +254,15 @@ p2p_update_receiver(
         {
             struct J1939_TP_CM_ACK ack;
             j1939_tp_ack_pack(tp, &ack);
-            tp_tx(
+            j1939_tp_tx(
                 tp,
                 J1939_TP_CM_PGN,
                 (uint8_t*)&ack,
                 J1939_TP_CM_LEN,
                 tp->msg_info.src,
                 J1939_TP_CM_PRI);
+
+            tp->j1939_rx(&tp->msg_info);
             j1939_tp_close_connection(tp);
         }
     }
@@ -298,22 +317,28 @@ j1939_tp_rx_rts(
     tp->clear_to_send = false;
 }
 
-void j1939_tp_rx_cts(
+void j1939_tp_cts_pack(
     struct J1939TP* tp,
     struct J1939_TP_CM_CTS* cts)
 {
-    // NOTE: the standard defines a method by which the receiver can delay the
-    //  data transmission while keeping the connection open. This is done by
-    //  sending a CTS message, with num_packages set to zero, every 0.5 seconds
-    //  until it's ready to receive the data. I'm choosing not to implement this.
-    //  Thus, when the sender receives a CTS message, it's assumed that the
-    //  receiver is ready to receive all bytes of payload.
-    (void)cts;
-
-    tp->clear_to_send = true;
+    cts->control_byte = J1939_TP_CM_CONTROL_BYTE_CTS;
+    cts->num_packages = tp->num_packages;
+    cts->next_seq = 1;
+    cts->res = 0xFFFF;
+    cts->pgn = tp->msg_info.pgn;
 }
 
-// TODO: ACK
+void
+j1939_tp_ack_pack(
+    struct J1939TP* tp,
+    struct J1939_TP_CM_ACK* ack)
+{
+    ack->control_byte = J1939_TP_CM_CONTROL_BYTE_ACK;
+    ack->len = tp->msg_info.len;
+    ack->num_packages = tp->num_packages;
+    ack->res = 0xFF;
+    ack->pgn = tp->msg_info.pgn;
+}
 
 void
 j1939_tp_rx_bam(
@@ -337,11 +362,19 @@ j1939_tp_rx_bam(
     tp->msg_info.pri = J1939_DEFAULT_PRIORITY;
 }
 
-void
-j1939_tp_rx_abort(
-    struct J1939TP* tp,
-    struct J1939_TP_CM_ABORT* abort)
+/* ============================================================================
+ *
+ * Section: Static function definitions
+ *
+ * ============================================================================
+ */
+
+static void
+timeout(
+    struct J1939TP* tp)
 {
-    if (abort->pgn == tp->msg_info.pgn)
-        j1939_tp_close_connection(tp);
+    struct J1939_TP_CM_ABORT abort;
+
+    j1939_tp_abort_pack(tp, &abort, J1939_TP_ABORT_REASON_TIMEOUT, tp->msg_info.pgn);
+    j1939_tp_close_connection(tp);
 }

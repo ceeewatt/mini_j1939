@@ -4,6 +4,16 @@
 
 #include <stdint.h>
 
+/* ============================================================================
+ *
+ * Section: Type definitions
+ *
+ * ============================================================================
+ */
+
+// A transport protocol connection be either:
+//  Broadcast: multi-packet message to sent to global address.
+//  Peer-to-peer: multi-packet message is sent to destination-specific address.
 enum j1939_tp_connection {
     J1939_TP_CONNECTION_NONE = 0,
     J1939_TP_CONNECTION_BROADCAST,
@@ -21,26 +31,26 @@ struct J1939TP {
     // Used for indexing into the global J1939Private array
     int node_idx;
 
+    // Buffer for holding the TP.DT payload
     uint8_t buf[J1939_TP_MAX_PAYLOAD];
 
-    // This is the multi-packet message that our connection is currently forming
-    // This is used by the receiver.
-    // msg_info.src: the source address of the node that opened the connection
-    // msg_info.dst:
-    //  - for BAM messages: global address (255)
-    //  - for P2P messages: our own source address
+    // This is the multi-packet message that our connection is currently trying
+    //  to send or receive. If we're the sender, this struct is basically
+    //  copied from the J1939Msg passed to j1939_tp_queue(). If we're the
+    //  receiver, we have to derive this information from the BAM or RTS msg.
+    //  This msg is passed to j1939_rx() once fully received.
     struct J1939Msg msg_info;
 
-    // Used to indicate what kind of connection is currently active (broadcast or peer-to-peer).
     // If this is set to NONE, a connection is not presently active.
+    // Indicates what kind of connection is currently active. If set to NONE, a
+    //  connection is not presently active.
     enum j1939_tp_connection connection;
 
-    // Used to indicate whether this node is a sender or receiver in a given connection.
-    // True: this node is a sender
-    // False: this node is a receiver
+    // True: this node is the sender (and the one that opened the connection).
+    // False: this node is the receiver.
     bool sender;
 
-    // This hold the sequence number of the next TP.DT packet.
+    // This holds the sequence number of the next TP.DT packet.
     // Sender: the next transmitted TP.DT packet will have this sequence number.
     // Receiver: the next received TP.DT packet should have this sequence number.
     uint8_t next_seq;
@@ -50,19 +60,20 @@ struct J1939TP {
     // Receiver: this number of bytes still needs to be received.
     uint16_t bytes_rem;
 
-    // The total number of Data Transfer packages that need to be transmitted for a given connection.
+    // The number of TP.DT messages that are necessary to transmit the
+    //  full multi-packet message.
     uint8_t num_packages;
 
     // Used for periodic message transmission and timeout tracking
     int timer_ms;
     int tick_rate_ms;
 
-    // This allows the TP layer to pass multi-packet messages directly to application
+    // Used to pass the received multi-packet messages to the application
     J1939_MSG_RX j1939_rx;
 
-    // Used for P2P connections
-    // Sender: we have received a CTS message from receiver and thus can begin data transfer
-    // Receiver: we have recieved an RTS message and replied with a CTS message, thus, we're ready to begin receiving data
+    // Used for P2P connections to signal when we're ready for data transfer.
+    // Sender: we've received a CTS msg and can begin transmitting data.
+    // Receiver: we've responded to an RTS with a CTS and are ready for data.
     bool clear_to_send;
 };
 
@@ -138,6 +149,13 @@ struct __attribute__((packed)) J1939_TP_CM_ABORT {
 // No limit on the number of packages sent during a P2P connection
 #define J1939_TP_CM_RTS_MAX_PACKAGES  (0xFF)
 
+/* ============================================================================
+ *
+ * Section: Function prototypes
+ *
+ * ============================================================================
+ */
+
 void
 j1939_tp_init(
     struct J1939TP* tp,
@@ -145,6 +163,8 @@ j1939_tp_init(
     int tick_rate_ms,
     J1939_MSG_RX j1939_rx);
 
+// Attempt to queue up a multi-packet message for transmission. Return true if
+//  successful, return false otherwise.
 bool
 j1939_tp_queue(
     struct J1939TP* tp,

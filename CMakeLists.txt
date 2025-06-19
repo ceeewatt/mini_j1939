@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(MiniJ1939)
+project(MiniJ1939 LANGUAGES C CXX)
 
 include(CTest)
 

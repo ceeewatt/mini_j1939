@@ -2,14 +2,47 @@
 
 #include <string.h>
 
+/* ============================================================================
+ *
+ * Section: Macros
+ *
+ * ============================================================================
+ */
+
 // Find the ceiling of the result of a / b, where a and b are positive integers
 #define CEIL_DIV(a, b)  ( ((a) / (b)) + (((a) % (b)) != 0) )
 
+/* ============================================================================
+ *
+ * Section: Static function prototypes
+ *
+ * ============================================================================
+ */
+
 static bool
 is_connection_active(
-    struct J1939TP* tp)
+    struct J1939TP* tp);
+
+/* ============================================================================
+ *
+ * Section: Function definitions
+ *
+ * ============================================================================
+ */
+
+void
+j1939_tp_init(
+    struct J1939TP* tp,
+    int node_idx,
+    int tick_rate_ms,
+    J1939_MSG_RX j1939_rx)
 {
-    return (tp->connection != J1939_TP_CONNECTION_NONE);
+    tp->node_idx = node_idx;
+
+    tp->connection = J1939_TP_CONNECTION_NONE;
+    tp->msg_info.data = tp->buf;
+    tp->tick_rate_ms = tick_rate_ms;
+    tp->j1939_rx = j1939_rx;
 }
 
 bool
@@ -40,7 +73,7 @@ j1939_tp_queue(
 
         struct J1939_TP_CM_BAM bam;
         j1939_tp_bam_pack(tp, &bam);
-        tp_tx(
+        j1939_tp_tx(
             tp,
             J1939_TP_CM_PGN,
             (uint8_t*)&bam,
@@ -50,11 +83,11 @@ j1939_tp_queue(
     }
     else
     {
-        tp->connection = J1939_TP_CONNECTION_BROADCAST;
+        tp->connection = J1939_TP_CONNECTION_P2P;
 
         struct J1939_TP_CM_RTS rts;
         j1939_tp_rts_pack(tp, &rts);
-        tp_tx(
+        j1939_tp_tx(
             tp,
             J1939_TP_CM_PGN,
             (uint8_t*)&rts,
@@ -129,8 +162,7 @@ j1939_tp_dispatch(
                 &abort,
                 J1939_TP_ABORT_REASON_BUSY,
                 (uint32_t)msg->data[5]);
-
-            tp_tx(
+            j1939_tp_tx(
                 tp,
                 J1939_TP_CM_PGN,
                 (uint8_t*)&abort,
@@ -158,18 +190,16 @@ j1939_tp_dispatch(
     }
 }
 
-void
-j1939_tp_init(
-    struct J1939TP* tp,
-    int node_idx,
-    int tick_rate_ms,
-    J1939_MSG_RX j1939_rx)
+/* ============================================================================
+ *
+ * Section: Static function definitions
+ *
+ * ============================================================================
+ */
+
+static bool
+is_connection_active(
+    struct J1939TP* tp)
 {
-    tp->node_idx = node_idx;
-
-    tp->connection = J1939_TP_CONNECTION_NONE;
-    tp->msg_info.data = tp->buf;
-    tp->tick_rate_ms = tick_rate_ms;
-    tp->j1939_rx = j1939_rx;
+    return (tp->connection != J1939_TP_CONNECTION_NONE);
 }
-
