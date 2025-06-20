@@ -411,5 +411,106 @@ TEST_CASE("Peer-to-peer sender", "[p2p_update_sender]")
 
 TEST_CASE("Peer-to-peer receiver", "[p2p_update_receiver]")
 {
+    J1939TP* tp = &g_j1939[TestJ1939::node.node_idx].tp;
 
+    constexpr uint8_t sender_node_address = 0x99;
+    constexpr uint32_t msg_pgn = 0xABCD;
+    const uint8_t receiver_node_address = g_j1939[TestJ1939::node.node_idx].j1939_public->source_address;
+
+    j1939_tp_close_connection(tp);
+    tp->timer_ms = 0;
+
+    uint8_t msg_data[15] = {
+        0x5a, 0x62, 0x38, 0xd8, 0x03, 0xd1, 0x40,
+        0x73, 0xc5, 0xa7, 0xc7, 0x83, 0x04, 0xd2,
+        0x88
+    };
+    const uint16_t msg_len = sizeof(msg_data);
+    const uint8_t msg_num_packages = static_cast<uint8_t>(std::ceil((double)msg_len / 7));
+    
+    J1939Msg msg { 
+        .pgn = msg_pgn,
+        .data = msg_data,
+        .len = msg_len,
+        .src = sender_node_address,
+        .dst = receiver_node_address,
+        .pri = J1939_DEFAULT_PRIORITY
+    };
+
+    // Emulate receiving an RTS
+    J1939_TP_CM_RTS rts {
+        .control_byte = J1939_TP_CM_CONTROL_BYTE_RTS,
+        .len = msg_len,
+        .num_packages = msg_num_packages,
+        .max_packages = J1939_TP_CM_RTS_MAX_PACKAGES,
+        .pgn = msg_pgn
+    };
+    J1939Msg received_msg {
+        .pgn = J1939_TP_CM_PGN,
+        .data = (uint8_t*)&rts,
+        .len = J1939_TP_CM_LEN,
+        .src = sender_node_address,
+        .dst = receiver_node_address,
+        .pri = J1939_TP_CM_PRI
+    };
+
+    j1939_tp_dispatch(tp, &received_msg);
+    REQUIRE(tp->clear_to_send == false);
+
+    // At the specified TX period, we should respond with a CTS
+    tp->timer_ms = J1939_TP_TX_PERIOD;
+    p2p_update_receiver(tp);
+
+    REQUIRE(tp->clear_to_send == true);
+    REQUIRE(TestJ1939::msg.pgn == J1939_TP_CM_PGN);
+    REQUIRE(TestJ1939::msg.len == J1939_TP_CM_LEN);
+    REQUIRE(TestJ1939::msg.src == receiver_node_address);
+    REQUIRE(TestJ1939::msg.dst == sender_node_address);
+    REQUIRE(TestJ1939::msg.pri == J1939_TP_CM_PRI);
+
+    J1939_TP_CM_CTS* cts = (J1939_TP_CM_CTS*)TestJ1939::msg.data;
+    REQUIRE(cts->control_byte == J1939_TP_CM_CONTROL_BYTE_CTS);
+    REQUIRE(cts->num_packages == msg_num_packages);
+    REQUIRE(cts->next_seq == 1);
+    REQUIRE(cts->res == 0xFFFF);
+    REQUIRE(cts->pgn == msg_pgn);
+
+    SECTION("Timeout if we don't receive data packets at given frequency")
+    {
+        tp->timer_ms = J1939_TP_TIMEOUT_T1;
+        p2p_update_receiver(tp);
+
+        REQUIRE(tp->connection == J1939_TP_CONNECTION_NONE);
+    }
+    SECTION("Send ACK and forward multi-packet msg if received successfully")
+    {
+        // Emulate receiving each of the TP.DT packets
+        J1939_TP_DT dt { .seq = 1 };
+        received_msg.pgn = J1939_TP_DT_PGN;
+        received_msg.data = (uint8_t*)&dt;
+        received_msg.len = J1939_TP_DT_LEN;
+        received_msg.src = sender_node_address;
+        received_msg.dst = receiver_node_address;
+        received_msg.pri = J1939_TP_DT_PRI;
+
+        for (int i = 0; i < msg_num_packages; ++i)
+        {
+            std::memcpy(
+                &dt.data0,
+                &msg_data[(tp->next_seq - 1) * 7],
+                (tp->bytes_rem < 7) ? tp->bytes_rem : 7);
+            j1939_tp_dispatch(tp, &received_msg);
+
+            dt.seq++;
+        }
+        p2p_update_receiver(tp);
+
+        REQUIRE(TestJ1939::msg.pgn == msg_pgn);
+        REQUIRE(TestJ1939::msg.len == msg_len);
+        REQUIRE(TestJ1939::msg.src == sender_node_address);
+        REQUIRE(TestJ1939::msg.dst == receiver_node_address);
+        REQUIRE(TestJ1939::msg.pri == J1939_DEFAULT_PRIORITY);
+        REQUIRE(std::memcmp(TestJ1939::msg.data, msg_data, sizeof(msg_data)) == 0);
+        REQUIRE(tp->connection == J1939_TP_CONNECTION_NONE);
+    }
 }
