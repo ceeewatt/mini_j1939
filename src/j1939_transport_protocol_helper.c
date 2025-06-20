@@ -80,7 +80,7 @@ j1939_tp_abort_pack(
  */
 
 void
-broadcast_update_sender(
+j1939_tp_broadcast_update_sender(
     struct J1939TP* tp)
 {
     if (tp->bytes_rem)
@@ -106,7 +106,7 @@ broadcast_update_sender(
 }
 
 void
-p2p_update_sender(
+j1939_tp_p2p_update_sender(
     struct J1939TP* tp)
 {
     if (tp->clear_to_send)
@@ -217,7 +217,7 @@ j1939_tp_bam_pack(
  */
 
 void
-broadcast_update_receiver(
+j1939_tp_broadcast_update_receiver(
     struct J1939TP* tp)
 {
     if (tp->timer_ms >= J1939_TP_TIMEOUT_T1)
@@ -232,7 +232,7 @@ broadcast_update_receiver(
 }
 
 void
-p2p_update_receiver(
+j1939_tp_p2p_update_receiver(
     struct J1939TP* tp)
 {
     if (!tp->clear_to_send)

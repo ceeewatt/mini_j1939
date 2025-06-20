@@ -103,7 +103,7 @@ TEST_CASE("Data in the buffer is packed properly into TP.DT packets", "[j1939_tp
     }
 }
 
-TEST_CASE("Broadcast sender", "[j1939_tp_queue][broadcast_update_sender]")
+TEST_CASE("Broadcast sender", "[j1939_tp_queue][j1939_tp_broadcast_update_sender]")
 {
     J1939Private* jp = &g_j1939[TestJ1939::node.node_idx];
     J1939Msg msg;
@@ -141,7 +141,7 @@ TEST_CASE("Broadcast sender", "[j1939_tp_queue][broadcast_update_sender]")
 
     // Send first TP.DT packet
     jp->tp.timer_ms = J1939_TP_TX_PERIOD;
-    broadcast_update_sender(&jp->tp);
+    j1939_tp_broadcast_update_sender(&jp->tp);
     J1939_TP_DT* dt = (J1939_TP_DT*)TestJ1939::msg.data;
 
     REQUIRE(TestJ1939::msg.pgn == J1939_TP_DT_PGN);
@@ -155,7 +155,7 @@ TEST_CASE("Broadcast sender", "[j1939_tp_queue][broadcast_update_sender]")
 
     // Send second TP.DT packet
     jp->tp.timer_ms = J1939_TP_TX_PERIOD;
-    broadcast_update_sender(&jp->tp);
+    j1939_tp_broadcast_update_sender(&jp->tp);
 
     REQUIRE(dt->seq == 2);
     REQUIRE(std::memcmp(&dt->data0, &data[7], 7) == 0);
@@ -163,18 +163,18 @@ TEST_CASE("Broadcast sender", "[j1939_tp_queue][broadcast_update_sender]")
 
     // Send third TP.DT packet
     jp->tp.timer_ms = J1939_TP_TX_PERIOD;
-    broadcast_update_sender(&jp->tp);
+    j1939_tp_broadcast_update_sender(&jp->tp);
 
     REQUIRE(dt->seq == 3);
     REQUIRE(dt->data0 == data[14]);
     REQUIRE(jp->tp.bytes_rem == 0);
 
     // Connection should now close
-    broadcast_update_sender(&jp->tp);
+    j1939_tp_broadcast_update_sender(&jp->tp);
     REQUIRE(jp->tp.connection == J1939_TP_CONNECTION_NONE);
 }
 
-TEST_CASE("Broadcast reciever", "[broadcast_update_receiver][j1939_tp_dispatch][j1939_tp_rx_dt]")
+TEST_CASE("Broadcast reciever", "[j1939_tp_broadcast_update_receiver][j1939_tp_dispatch][j1939_tp_rx_dt]")
 {
     // Emulate receiving the multi-byte packet from a sender node
 
@@ -220,7 +220,7 @@ TEST_CASE("Broadcast reciever", "[broadcast_update_receiver][j1939_tp_dispatch][
     SECTION("Timeout")
     {
         jp->tp.timer_ms = J1939_TP_TIMEOUT_T1;
-        broadcast_update_receiver(&jp->tp);
+        j1939_tp_broadcast_update_receiver(&jp->tp);
 
         REQUIRE(jp->tp.connection == J1939_TP_CONNECTION_NONE);
     }
@@ -259,7 +259,7 @@ TEST_CASE("Broadcast reciever", "[broadcast_update_receiver][j1939_tp_dispatch][
         dt.data0 = msg_data[14];
         j1939_tp_dispatch(&jp->tp, &dt_msg);
 
-        broadcast_update_receiver(&jp->tp);
+        j1939_tp_broadcast_update_receiver(&jp->tp);
 
         REQUIRE(jp->tp.bytes_rem == 0);
         REQUIRE(jp->tp.connection == J1939_TP_CONNECTION_NONE);
@@ -272,7 +272,7 @@ TEST_CASE("Broadcast reciever", "[broadcast_update_receiver][j1939_tp_dispatch][
     }
 }
 
-TEST_CASE("Peer-to-peer sender", "[p2p_update_sender]")
+TEST_CASE("Peer-to-peer sender", "[j1939_tp_p2p_update_sender]")
 {
     J1939Private* jp = &g_j1939[TestJ1939::node.node_idx];
 
@@ -346,7 +346,7 @@ TEST_CASE("Peer-to-peer sender", "[p2p_update_sender]")
         for (int package = 0; package < msg_num_packages; package++)
         {
             jp->tp.timer_ms = J1939_TP_TX_PERIOD;
-            p2p_update_sender(&jp->tp);
+            j1939_tp_p2p_update_sender(&jp->tp);
 
             bytes_rem_expected -= (bytes_rem_expected < 7) ? bytes_rem_expected : 7;
             REQUIRE(jp->tp.bytes_rem == bytes_rem_expected);
@@ -374,7 +374,7 @@ TEST_CASE("Peer-to-peer sender", "[p2p_update_sender]")
         SECTION("Timeout occurs if we don't receive an ACK")
         {
             jp->tp.timer_ms = J1939_TP_TIMEOUT_T3;
-            p2p_update_sender(&jp->tp);
+            j1939_tp_p2p_update_sender(&jp->tp);
 
             REQUIRE(TestJ1939::msg.pgn == J1939_TP_CM_PGN);
             REQUIRE(TestJ1939::msg.len == J1939_TP_CM_LEN);
@@ -393,7 +393,7 @@ TEST_CASE("Peer-to-peer sender", "[p2p_update_sender]")
     SECTION("Timeout occurs if sender doesn't receive a CTS in response")
     {
         jp->tp.timer_ms = J1939_TP_TIMEOUT_TR;
-        p2p_update_sender(&jp->tp);
+        j1939_tp_p2p_update_sender(&jp->tp);
 
         REQUIRE(TestJ1939::msg.pgn == J1939_TP_CM_PGN);
         REQUIRE(TestJ1939::msg.len == J1939_TP_CM_LEN);
@@ -409,7 +409,7 @@ TEST_CASE("Peer-to-peer sender", "[p2p_update_sender]")
     }
 }
 
-TEST_CASE("Peer-to-peer receiver", "[p2p_update_receiver]")
+TEST_CASE("Peer-to-peer receiver", "[j1939_tp_p2p_update_receiver]")
 {
     J1939TP* tp = &g_j1939[TestJ1939::node.node_idx].tp;
 
@@ -459,7 +459,7 @@ TEST_CASE("Peer-to-peer receiver", "[p2p_update_receiver]")
 
     // At the specified TX period, we should respond with a CTS
     tp->timer_ms = J1939_TP_TX_PERIOD;
-    p2p_update_receiver(tp);
+    j1939_tp_p2p_update_receiver(tp);
 
     REQUIRE(tp->clear_to_send == true);
     REQUIRE(TestJ1939::msg.pgn == J1939_TP_CM_PGN);
@@ -478,7 +478,7 @@ TEST_CASE("Peer-to-peer receiver", "[p2p_update_receiver]")
     SECTION("Timeout if we don't receive data packets at given frequency")
     {
         tp->timer_ms = J1939_TP_TIMEOUT_T1;
-        p2p_update_receiver(tp);
+        j1939_tp_p2p_update_receiver(tp);
 
         REQUIRE(tp->connection == J1939_TP_CONNECTION_NONE);
     }
@@ -503,7 +503,7 @@ TEST_CASE("Peer-to-peer receiver", "[p2p_update_receiver]")
 
             dt.seq++;
         }
-        p2p_update_receiver(tp);
+        j1939_tp_p2p_update_receiver(tp);
 
         REQUIRE(TestJ1939::msg.pgn == msg_pgn);
         REQUIRE(TestJ1939::msg.len == msg_len);

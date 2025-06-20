@@ -57,11 +57,11 @@ j1939_tp_abort_pack(
  */
 
 void
-broadcast_update_sender(
+j1939_tp_broadcast_update_sender(
     struct J1939TP* tp);
 
 void
-p2p_update_sender(
+j1939_tp_p2p_update_sender(
     struct J1939TP* tp);
 
 void
@@ -94,11 +94,11 @@ j1939_tp_bam_pack(
  */
 
 void
-broadcast_update_receiver(
+j1939_tp_broadcast_update_receiver(
     struct J1939TP* tp);
 
 void
-p2p_update_receiver(
+j1939_tp_p2p_update_receiver(
     struct J1939TP* tp);
 
 // Return false if TP.DT message is not received successfully

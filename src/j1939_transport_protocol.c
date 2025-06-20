@@ -107,16 +107,16 @@ j1939_tp_update(
     if (tp->connection == J1939_TP_CONNECTION_BROADCAST)
     {
         if (tp->sender)
-            broadcast_update_sender(tp);
+            j1939_tp_broadcast_update_sender(tp);
         else
-            broadcast_update_receiver(tp);
+            j1939_tp_broadcast_update_receiver(tp);
     }
     else
     {
         if (tp->sender)
-            p2p_update_sender(tp);
+            j1939_tp_p2p_update_sender(tp);
         else
-            p2p_update_receiver(tp);
+            j1939_tp_p2p_update_receiver(tp);
     }
 
     tp->timer_ms += tp->tick_rate_ms;
