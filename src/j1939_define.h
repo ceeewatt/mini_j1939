@@ -1,8 +1,23 @@
 #pragma once
 
+#include <stdint.h>
+
 #define J1939_ADDR_GLOBAL (255)
 #define J1939_ADDR_NULL   (254)
 
 #define J1939_TP_MAX_PAYLOAD  (255 * 7)
 
 #define J1939_DEFAULT_PRIORITY  (6)
+
+struct __attribute__((packed)) J1939Name {
+    uint32_t identity : 21;
+    uint16_t manufacturer : 11;
+    uint8_t ecu_instance : 3;
+    uint8_t function_instance : 5;
+    uint8_t function : 8;
+    uint8_t res : 1;
+    uint8_t vehicle_system : 7;
+    uint8_t vehicle_system_instance : 4;
+    uint8_t industry_group : 3;
+    uint8_t arbitrary_addr_capable : 1;
+};

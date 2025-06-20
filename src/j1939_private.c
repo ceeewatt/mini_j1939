@@ -15,6 +15,11 @@ dispatch(
 
     switch (msg->pgn)
     {
+    // TODO: REQUEST
+
+    case J1939_ADDRESS_CLAIMED_PGN:
+        j1939_ac_rx_address_claim(&jp->ac, msg);
+        break;
     case J1939_TP_CM_PGN:
     case J1939_TP_DT_PGN:
         j1939_tp_dispatch(&jp->tp, msg);
@@ -28,6 +33,7 @@ dispatch(
 bool
 j1939_init(
     struct J1939* node,
+    struct J1939Name* name,
     uint8_t preferred_address,
     int tick_rate_ms,
     J1939_CAN_RX can_rx,
@@ -50,7 +56,7 @@ j1939_init(
 
     j1939_tp_init(&g_j1939[next_idx].tp, next_idx, tick_rate_ms);
 
-    j1939_ac_init(&g_j1939[next_idx].ac, next_idx);
+    j1939_ac_init(&g_j1939[next_idx].ac, next_idx, name);
 
     next_idx++;
     return true;
@@ -154,4 +160,25 @@ j1939_can_frame_unpack(
         msg->data[i] = frame->data[i];
 
     return true;
+}
+
+void
+j1939_tx_helper(
+    int node_idx,
+    uint32_t pgn,
+    uint8_t* data,
+    uint16_t len,
+    uint8_t dst,
+    uint8_t pri)
+{
+    struct J1939Private* jp = &g_j1939[node_idx];
+    struct J1939Msg msg = {
+        .pgn = pgn,
+        .data = data,
+        .len = len,
+        .dst = dst,
+        .pri = pri
+    };
+
+    (void)j1939_tx(jp->j1939_public, &msg);
 }

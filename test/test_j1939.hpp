@@ -25,6 +25,7 @@ public:
     static J1939 node;
     static J1939Msg msg;
     static uint8_t msg_buf[J1939_TP_MAX_PAYLOAD];
+    static J1939Name name;
 
     static bool can_tx(J1939Msg* msg);
     static void j1939_rx(J1939Msg* msg);

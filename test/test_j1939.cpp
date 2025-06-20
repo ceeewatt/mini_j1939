@@ -3,6 +3,17 @@
 J1939 TestJ1939::node;
 uint8_t TestJ1939::msg_buf[J1939_TP_MAX_PAYLOAD];
 J1939Msg TestJ1939::msg { .data = TestJ1939::msg_buf };
+J1939Name TestJ1939::name {
+    .identity = 0xA,
+    .manufacturer = 0xB,
+    .ecu_instance = 0,
+    .function_instance = 1,
+    .function = 2,
+    .vehicle_system = 0xC,
+    .vehicle_system_instance = 0xD,
+    .industry_group = 7,
+    .arbitrary_addr_capable = 1
+};
 
 bool TestJ1939::can_tx(J1939Msg* msg)
 {
@@ -31,6 +42,7 @@ void TestJ1939::testRunStarting(Catch::TestRunInfo const& test_run_info)
     const uint8_t preferred_address = 0x27;
     (void)j1939_init(
         &TestJ1939::node,
+        &TestJ1939::name,
         preferred_address,
         0,
         NULL,

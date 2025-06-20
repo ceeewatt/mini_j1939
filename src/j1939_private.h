@@ -37,7 +37,15 @@ j1939_can_frame_unpack(
     struct J1939CanFrame* frame,
     struct J1939Msg* msg);
 
-
+// Helper function for transport protocol and address claim
+void
+j1939_tx_helper(
+    int node_idx,
+    uint32_t pgn,
+    uint8_t* data,
+    uint16_t len,
+    uint8_t dst,
+    uint8_t pri);
 
 extern struct J1939Private g_j1939[];
 
