@@ -1,6 +1,7 @@
 #include "test_j1939.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <cmath>
 
 TEST_CASE("Data from TP.DT packets are received and added to the buffer", "[j1939_tp_rx_dt]")
 {
@@ -173,7 +174,7 @@ TEST_CASE("Broadcast sender", "[j1939_tp_queue][broadcast_update_sender]")
     REQUIRE(jp->tp.connection == J1939_TP_CONNECTION_NONE);
 }
 
-TEST_CASE("Broadcast reciever", "[broadcast_update_receiver]")
+TEST_CASE("Broadcast reciever", "[broadcast_update_receiver][j1939_tp_dispatch][j1939_tp_rx_dt]")
 {
     // Emulate receiving the multi-byte packet from a sender node
 
@@ -269,4 +270,146 @@ TEST_CASE("Broadcast reciever", "[broadcast_update_receiver]")
         REQUIRE(jp->tp.msg_info.pri == J1939_DEFAULT_PRIORITY);
         REQUIRE(std::memcmp(jp->tp.buf, TestJ1939::msg.data, sizeof(msg_data)) == 0);
     }
+}
+
+TEST_CASE("Peer-to-peer sender", "[p2p_update_sender]")
+{
+    J1939Private* jp = &g_j1939[TestJ1939::node.node_idx];
+
+    constexpr uint8_t receiver_node_address = 0x99;
+    constexpr uint32_t msg_pgn = 0xABCD;
+    const uint8_t sender_node_address = jp->j1939_public->source_address;
+
+    j1939_tp_close_connection(&jp->tp);
+    jp->tp.timer_ms = 0;
+
+    uint8_t msg_data[15] = {
+        0x5a, 0x62, 0x38, 0xd8, 0x03, 0xd1, 0x40,
+        0x73, 0xc5, 0xa7, 0xc7, 0x83, 0x04, 0xd2,
+        0x88
+    };
+    const uint16_t msg_len = sizeof(msg_data);
+    const uint8_t msg_num_packages = static_cast<uint8_t>(std::ceil((double)msg_len / 7));
+    
+    J1939Msg msg { 
+        .pgn = msg_pgn,
+        .data = msg_data,
+        .len = msg_len,
+        .src = sender_node_address,
+        .dst = receiver_node_address,
+        .pri = J1939_DEFAULT_PRIORITY
+    };
+
+    // Send RTS
+    bool queue_result = j1939_tp_queue(&jp->tp, &msg);
+
+    SECTION("Normal data transfer")
+    {
+        REQUIRE(queue_result == true);
+        REQUIRE(jp->tp.connection == J1939_TP_CONNECTION_P2P);
+        REQUIRE(jp->tp.clear_to_send == false);
+        REQUIRE(TestJ1939::msg.pgn == J1939_TP_CM_PGN);
+        REQUIRE(TestJ1939::msg.len == J1939_TP_CM_LEN);
+        REQUIRE(TestJ1939::msg.pri == J1939_TP_CM_PRI);
+        REQUIRE(TestJ1939::msg.dst == receiver_node_address);
+        REQUIRE(TestJ1939::msg.src == sender_node_address);
+
+        J1939_TP_CM_RTS* rts = (J1939_TP_CM_RTS*)TestJ1939::msg.data;
+        REQUIRE(rts->control_byte == J1939_TP_CM_CONTROL_BYTE_RTS);
+        REQUIRE(rts->len == msg_len);
+        REQUIRE(rts->num_packages == msg_num_packages);
+        REQUIRE(rts->max_packages == J1939_TP_CM_RTS_MAX_PACKAGES);
+        REQUIRE(rts->pgn == msg_pgn);
+
+        // Emulate receiving a CTS in response
+        J1939_TP_CM_CTS cts = {
+            .control_byte = J1939_TP_CM_CONTROL_BYTE_CTS,
+            .num_packages = msg_num_packages,
+            .next_seq = 1,
+            .res = 0xFFFF,
+            .pgn = msg_pgn
+        };
+        J1939Msg response_msg {
+            .pgn = J1939_TP_CM_PGN,
+            .data = (uint8_t*)&cts,
+            .len = J1939_TP_CM_LEN,
+            .src = receiver_node_address,
+            .dst = sender_node_address,
+            .pri = J1939_TP_CM_PRI
+        };
+
+        j1939_tp_dispatch(&jp->tp, &response_msg);
+        REQUIRE(jp->tp.clear_to_send == true);
+
+        // Send all TP.DT packets
+        uint8_t bytes_rem_expected = msg_len;
+        for (int package = 0; package < msg_num_packages; package++)
+        {
+            jp->tp.timer_ms = J1939_TP_TX_PERIOD;
+            p2p_update_sender(&jp->tp);
+
+            bytes_rem_expected -= (bytes_rem_expected < 7) ? bytes_rem_expected : 7;
+            REQUIRE(jp->tp.bytes_rem == bytes_rem_expected);
+        }
+
+        SECTION("Connection closes after receiving end of msg ACK")
+        {
+            J1939_TP_CM_ACK ack {
+                .control_byte = J1939_TP_CM_CONTROL_BYTE_ACK,
+                .len = msg_len,
+                .num_packages = msg_num_packages,
+                .res = 0xFF,
+                .pgn = msg_pgn
+            };
+            response_msg.pgn = J1939_TP_CM_PGN;
+            response_msg.data = (uint8_t*)&ack;
+            response_msg.len = J1939_TP_CM_LEN;
+            response_msg.src = receiver_node_address;
+            response_msg.dst = sender_node_address;
+            response_msg.pri = J1939_TP_CM_PRI;
+
+            j1939_tp_dispatch(&jp->tp, &response_msg);
+            REQUIRE(jp->tp.connection == J1939_TP_CONNECTION_NONE);
+        }
+        SECTION("Timeout occurs if we don't receive an ACK")
+        {
+            jp->tp.timer_ms = J1939_TP_TIMEOUT_T3;
+            p2p_update_sender(&jp->tp);
+
+            REQUIRE(TestJ1939::msg.pgn == J1939_TP_CM_PGN);
+            REQUIRE(TestJ1939::msg.len == J1939_TP_CM_LEN);
+            REQUIRE(TestJ1939::msg.src == sender_node_address);
+            REQUIRE(TestJ1939::msg.dst == receiver_node_address);
+            REQUIRE(TestJ1939::msg.pri == J1939_TP_CM_PRI);
+
+            J1939_TP_CM_ABORT* abort = (J1939_TP_CM_ABORT*)TestJ1939::msg.data;
+            REQUIRE(abort->control_byte == J1939_TP_CM_CONTROL_BYTE_ABORT);
+            REQUIRE(abort->abort_reason == J1939_TP_ABORT_REASON_TIMEOUT);
+            REQUIRE(abort->pgn == msg_pgn);
+            REQUIRE(jp->tp.connection == J1939_TP_CONNECTION_NONE);
+        }
+
+    }
+    SECTION("Timeout occurs if sender doesn't receive a CTS in response")
+    {
+        jp->tp.timer_ms = J1939_TP_TIMEOUT_TR;
+        p2p_update_sender(&jp->tp);
+
+        REQUIRE(TestJ1939::msg.pgn == J1939_TP_CM_PGN);
+        REQUIRE(TestJ1939::msg.len == J1939_TP_CM_LEN);
+        REQUIRE(TestJ1939::msg.src == sender_node_address);
+        REQUIRE(TestJ1939::msg.dst == receiver_node_address);
+        REQUIRE(TestJ1939::msg.pri == J1939_TP_CM_PRI);
+
+        J1939_TP_CM_ABORT* abort = (J1939_TP_CM_ABORT*)TestJ1939::msg.data;
+        REQUIRE(abort->control_byte == J1939_TP_CM_CONTROL_BYTE_ABORT);
+        REQUIRE(abort->abort_reason == J1939_TP_ABORT_REASON_TIMEOUT);
+        REQUIRE(abort->pgn == msg_pgn);
+        REQUIRE(jp->tp.connection == J1939_TP_CONNECTION_NONE);
+    }
+}
+
+TEST_CASE("Peer-to-peer receiver", "[p2p_update_receiver]")
+{
+
 }

@@ -195,7 +195,7 @@ j1939_tp_rx_ack(
     struct J1939TP* tp,
     struct J1939_TP_CM_ACK* ack)
 {
-    if (ack->pgn == tp->msg_info.pgn)
+    if ((ack->pgn == tp->msg_info.pgn) && (tp->bytes_rem == 0))
         j1939_tp_close_connection(tp);
 }
 
@@ -393,5 +393,12 @@ timeout(
     struct J1939_TP_CM_ABORT abort;
 
     j1939_tp_abort_pack(tp, &abort, J1939_TP_ABORT_REASON_TIMEOUT, tp->msg_info.pgn);
+    j1939_tp_tx(
+        tp,
+        J1939_TP_CM_PGN,
+        (uint8_t*)&abort,
+        J1939_TP_CM_LEN,
+        tp->msg_info.dst,
+        J1939_TP_CM_PRI);
     j1939_tp_close_connection(tp);
 }

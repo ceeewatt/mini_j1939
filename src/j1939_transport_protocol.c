@@ -176,13 +176,16 @@ j1939_tp_dispatch(
             j1939_tp_rx_rts(tp, (struct J1939_TP_CM_RTS*)msg->data, msg->src);
             break;
         case J1939_TP_CM_CONTROL_BYTE_CTS:
+            j1939_tp_rx_cts(tp, (struct J1939_TP_CM_CTS*)msg->data);
             break;
         case J1939_TP_CM_CONTROL_BYTE_ACK:
+            j1939_tp_rx_ack(tp, (struct J1939_TP_CM_ACK*)msg->data);
             break;
         case J1939_TP_CM_CONTROL_BYTE_BAM:
             j1939_tp_rx_bam(tp, (struct J1939_TP_CM_BAM*)msg->data, msg->src);
             break;
         case J1939_TP_CM_CONTROL_BYTE_ABORT:
+            j1939_tp_rx_abort(tp, (struct J1939_TP_CM_ABORT*)msg->data);
             break;
         }
     }
