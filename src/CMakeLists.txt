@@ -11,9 +11,11 @@ option(
 
 set(SOURCES
     j1939.h
+    j1939_define.h
     j1939_private.c
     j1939_private.h
-    j1939_define.h
+    j1939_address_claim.c
+    j1939_address_claim.h
     j1939_transport_protocol.h
     j1939_transport_protocol.c
     j1939_transport_protocol_helper.c

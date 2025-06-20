@@ -6,6 +6,7 @@ set(SOURCES
     test_j1939.cpp
     test_j1939.hpp
     test_j1939_private.cpp
+    test_j1939_address_claim.cpp
     test_j1939_transport_protocol.cpp
 )
 

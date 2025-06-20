@@ -174,7 +174,7 @@ TEST_CASE("Broadcast sender", "[j1939_tp_queue][j1939_tp_broadcast_update_sender
     REQUIRE(jp->tp.connection == J1939_TP_CONNECTION_NONE);
 }
 
-TEST_CASE("Broadcast reciever", "[j1939_tp_broadcast_update_receiver][j1939_tp_dispatch][j1939_tp_rx_dt]")
+TEST_CASE("Broadcast reciever", "[j1939_tp_broadcast_update_receiver]")
 {
     // Emulate receiving the multi-byte packet from a sender node
 

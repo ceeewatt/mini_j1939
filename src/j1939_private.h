@@ -2,11 +2,14 @@
 
 #include "j1939.h"
 #include "j1939_transport_protocol.h"
+#include "j1939_address_claim.h"
 
 struct J1939Private {
     struct J1939* j1939_public;
 
     struct J1939TP tp;
+
+    struct J1939AC ac;
 
     // CAN ID fields of the most recently processed CAN frame
     struct CanIdConverter {

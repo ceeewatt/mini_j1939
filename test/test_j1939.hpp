@@ -17,6 +17,7 @@ extern "C" {
 
     #include "j1939_private.h"
     #include "j1939_transport_protocol_helper.h"
+    #include "j1939_address_claim.h"
 }
 
 class TestJ1939 : public Catch::EventListenerBase {
