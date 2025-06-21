@@ -70,7 +70,9 @@ void
 j1939_ac_init(
     struct J1939AC* ac,
     int node_idx,
-    struct J1939Name* name);
+    struct J1939Name* name,
+    J1939_AC_STARTUP_DELAY_250MS startup_delay,
+    void* startup_delay_param);
 
 bool
 j1939_ac_update_address(
@@ -80,3 +82,7 @@ void
 j1939_ac_rx_address_claim(
     struct J1939AC* ac,
     struct J1939Msg* msg);
+
+void
+j1939_ac_rx_address_claim_request(
+    struct J1939AC* ac);

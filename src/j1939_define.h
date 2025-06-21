@@ -9,6 +9,13 @@
 
 #define J1939_DEFAULT_PRIORITY  (6)
 
+struct __attribute__((packed)) J1939_REQUEST {
+    uint32_t pgn : 24;
+};
+#define J1939_REQUEST_PGN  (0x00EA00)
+#define J1939_REQUEST_LEN  (3)
+#define J1939_REQUEST_PRI  (6)
+
 struct __attribute__((packed)) J1939Name {
     uint32_t identity : 21;
     uint16_t manufacturer : 11;

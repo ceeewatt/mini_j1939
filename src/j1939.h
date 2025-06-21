@@ -25,9 +25,15 @@ typedef bool (*J1939_CAN_RX)(struct J1939CanFrame*);
 typedef bool (*J1939_CAN_TX)(struct J1939Msg*);
 typedef void (*J1939_MSG_RX)(struct J1939Msg*);
 
+// The application should provide a function that enters a blocking 250ms delay.
+// This is executed once during device initialization to allow for competing
+//  address claims to be resolved.
+typedef void (*J1939_AC_STARTUP_DELAY_250MS)(void*);
+
 struct J1939 {
     // An index given to this node; will be zero if there's just a single node
     int node_idx;
+
     uint8_t source_address;
 
     // The rate in ms at which the update function is called
@@ -36,6 +42,9 @@ struct J1939 {
     J1939_CAN_RX can_rx;
     J1939_CAN_TX can_tx;
     J1939_MSG_RX j1939_rx;
+
+    J1939_AC_STARTUP_DELAY_250MS startup_delay;
+    void* startup_delay_param;
 };
 
 bool
@@ -46,7 +55,9 @@ j1939_init(
     int tick_rate_ms,
     J1939_CAN_RX can_rx,
     J1939_CAN_TX can_tx,
-    J1939_MSG_RX j1939_rx);
+    J1939_MSG_RX j1939_rx,
+    J1939_AC_STARTUP_DELAY_250MS startup_delay,
+    void* startup_delay_param);
 
 void
 j1939_update(

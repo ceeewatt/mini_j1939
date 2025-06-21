@@ -15,6 +15,12 @@ J1939Name TestJ1939::name {
     .arbitrary_addr_capable = 1
 };
 
+void startup_delay_250ms(void* param)
+{
+    (void)param;
+    return;
+}
+
 bool TestJ1939::can_tx(J1939Msg* msg)
 {
     TestJ1939::msg.pgn = msg->pgn;
@@ -47,7 +53,9 @@ void TestJ1939::testRunStarting(Catch::TestRunInfo const& test_run_info)
         0,
         NULL,
         &TestJ1939::can_tx,
-        &TestJ1939::j1939_rx);
+        &TestJ1939::j1939_rx,
+        startup_delay_250ms,
+        nullptr);
 }
 
 CATCH_REGISTER_LISTENER(TestJ1939)

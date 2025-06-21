@@ -15,8 +15,6 @@ dispatch(
 
     switch (msg->pgn)
     {
-    // TODO: REQUEST
-
     case J1939_ADDRESS_CLAIMED_PGN:
         j1939_ac_rx_address_claim(&jp->ac, msg);
         break;
@@ -24,6 +22,14 @@ dispatch(
     case J1939_TP_DT_PGN:
         j1939_tp_dispatch(&jp->tp, msg);
         break;
+    case J1939_REQUEST_PGN:
+        if (((struct J1939_REQUEST*)msg->data)->pgn == J1939_ADDRESS_CLAIMED_PGN)
+        {
+            j1939_ac_rx_address_claim_request(&jp->ac);
+            break;
+        }
+    // Fallthrough to application
+    __attribute__((fallthrough));
     default:
         node->j1939_rx(msg);
         break;
@@ -38,7 +44,9 @@ j1939_init(
     int tick_rate_ms,
     J1939_CAN_RX can_rx,
     J1939_CAN_TX can_tx,
-    J1939_MSG_RX j1939_rx)
+    J1939_MSG_RX j1939_rx,
+    J1939_AC_STARTUP_DELAY_250MS startup_delay,
+    void* startup_delay_param)
 {
     static int next_idx = 0;
 
@@ -54,9 +62,17 @@ j1939_init(
     node->can_tx = can_tx;
     node->j1939_rx = j1939_rx;
 
-    j1939_tp_init(&g_j1939[next_idx].tp, next_idx, tick_rate_ms);
+    j1939_tp_init(
+        &g_j1939[next_idx].tp,
+        next_idx,
+        tick_rate_ms);
 
-    j1939_ac_init(&g_j1939[next_idx].ac, next_idx, name);
+    j1939_ac_init(
+        &g_j1939[next_idx].ac,
+        next_idx,
+        name,
+        startup_delay,
+        startup_delay_param);
 
     next_idx++;
     return true;

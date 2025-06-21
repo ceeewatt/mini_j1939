@@ -4,6 +4,22 @@
 #include <string.h>
 
 static void
+clear_address_table(
+    struct J1939AC* ac)
+{
+    // TODO
+    struct J1939Private* jp = &g_j1939[ac->node_idx];
+
+    memset(ac->address_table, 0, sizeof(ac->address_table));
+
+    if (jp->j1939_public->source_address < J1939_AC_MAX_ADDRESSES)
+    {
+        ac->address_table[jp->j1939_public->source_address] = 1;
+        ac->addresses_available = J1939_AC_MAX_ADDRESSES - 1;
+    }
+}
+
+static void
 cannot_claim_address(
     struct J1939AC* ac)
 {
@@ -23,11 +39,23 @@ void
 j1939_ac_init(
     struct J1939AC* ac,
     int node_idx,
-    struct J1939Name* name)
+    struct J1939Name* name,
+    J1939_AC_STARTUP_DELAY_250MS startup_delay,
+    void* startup_delay_param)
 {
-    ac->node_idx = node_idx;
+    struct J1939* node = g_j1939[ac->node_idx].j1939_public;
 
+    ac->node_idx = node_idx;
+    ac->cannot_claim_address = false;
     memcpy(&ac->name, name, sizeof(struct J1939Name));
+
+    clear_address_table(ac);
+
+    // On startup, nodes claiming addresses in the range 0-127 or 248-253 may
+    //  begin their regular network activities immediately. Nodes claiming
+    //  other addresses should wait 250ms to begin.
+    if ((node->source_address > 127) && (node->source_address < 248))
+        startup_delay(startup_delay_param);
 }
 
 bool
@@ -95,4 +123,22 @@ j1939_ac_rx_address_claim(
         ac->address_table[msg->src] = 1;
         ac->addresses_available--;
     }
+}
+
+void
+j1939_ac_rx_address_claim_request(
+    struct J1939AC* ac)
+{
+    // Each node in the network should respond to the request for address claim.
+    // This allows us to update our address table.
+    clear_address_table(ac);
+
+    // Send address claimed message
+    j1939_tx_helper(
+        ac->node_idx,
+        J1939_ADDRESS_CLAIMED_PGN,
+        (uint8_t*)&ac->name,
+        J1939_ADDRESS_CLAIMED_LEN,
+        J1939_ADDR_GLOBAL,
+        J1939_ADDRESS_CLAIMED_PRI);
 }
