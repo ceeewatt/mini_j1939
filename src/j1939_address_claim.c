@@ -41,6 +41,15 @@ j1939_ac_init(
 
     clear_address_table(ac);
 
+    // Send address claimed message
+    j1939_tx_helper(
+        ac->node_idx,
+        J1939_ADDRESS_CLAIMED_PGN,
+        (uint8_t*)&ac->name,
+        J1939_ADDRESS_CLAIMED_LEN,
+        J1939_ADDR_GLOBAL,
+        J1939_ADDRESS_CLAIMED_PRI);
+
     // On startup, nodes claiming addresses in the range 0-127 or 248-253 may
     //  begin their regular network activities immediately. Nodes claiming
     //  other addresses should wait 250ms to begin.
