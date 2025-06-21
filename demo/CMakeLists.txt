@@ -13,8 +13,5 @@ add_executable(node2
     node_helper.h
 )
 
-target_include_directories(node1 PRIVATE ${MINI_J1939_INCLUDE_DIRS})
-target_include_directories(node2 PRIVATE ${MINI_J1939_INCLUDE_DIRS})
-
-target_link_libraries(node1 PRIVATE mini_j1939)
-target_link_libraries(node2 PRIVATE mini_j1939)
+target_link_libraries(node1 PRIVATE MiniJ1939::mini_j1939_lib)
+target_link_libraries(node2 PRIVATE MiniJ1939::mini_j1939_lib)

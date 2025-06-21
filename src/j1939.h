@@ -126,3 +126,8 @@ bool
 j1939_tx(
     struct J1939* node,
     struct J1939Msg* msg);
+
+// Optional helper function for physical layer to derive CAN ID from J1939Msg
+uint32_t
+j1939_msg_to_can_id(
+    struct J1939Msg* msg);

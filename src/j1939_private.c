@@ -165,6 +165,25 @@ j1939_tx(
 #endif
 }
 
+uint32_t
+j1939_msg_to_can_id(
+    struct J1939Msg* msg)
+{
+    uint8_t dp = (msg->pgn >> 16) & 0x01;
+    uint8_t pf = (msg->pgn >> 8) & 0xFF;
+    uint8_t ps = (pf < 240) ? msg->dst : (msg->pgn & 0xFF);
+
+    uint32_t can_id =
+        (1 << 31)         |
+        (msg->pri << 26)  |
+        (dp << 24)        |
+        (pf << 16)        |
+        (ps << 8)         |
+        msg->src;
+
+    return can_id;
+}
+
 /* ============================================================================
  * Subsection: Private function definitions
  * ============================================================================

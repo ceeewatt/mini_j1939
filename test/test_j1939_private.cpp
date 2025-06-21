@@ -48,6 +48,41 @@ TEST_CASE("CAN ID conversion successfully parses fields from 29-bit CAN ID", "[j
     }
 }
 
+TEST_CASE("CAN ID is derived successfully from J1939Msg", "[j1939_msg_to_can_id]")
+{
+    SECTION("PDU1 format message")
+    {
+        // Note: DP bit set
+        uint32_t expected = 0x91ECFFAB;
+        
+        J1939Msg msg {
+            .pgn = 0x01EC00,
+            .data = nullptr,
+            .len = 0,
+            .src = 0xAB,
+            .dst = 0xFF,
+            .pri = 4
+        };
+
+        REQUIRE(j1939_msg_to_can_id(&msg) == expected);
+    }
+    SECTION("PDU2 format message")
+    {
+        uint32_t expected = 0x9CF0ABFE;
+
+        J1939Msg msg {
+            .pgn = 0x00F0AB,
+            .data = nullptr,
+            .len = 0,
+            .src = 0xFE,
+            .dst = 0xFF,
+            .pri = 7
+        };
+
+        REQUIRE(j1939_msg_to_can_id(&msg) == expected);
+    }
+}
+
 TEST_CASE("CAN frames are successfully converted to J1939 messages", "[j1939_can_frame_unpack]")
 {
     J1939* node = &TestJ1939::node;
