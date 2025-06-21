@@ -19,7 +19,7 @@ extern "C" {
     #include "j1939_transport_protocol_helper.h"
     #include "j1939_address_claim.h"
 
-    extern J1939Private g_j1939[];
+    extern struct J1939Private g_j1939[];
 }
 
 class TestJ1939 : public Catch::EventListenerBase {
@@ -29,6 +29,7 @@ public:
     static uint8_t msg_buf[J1939_TP_MAX_PAYLOAD];
     static J1939Name name;
 
+    static bool can_rx(J1939CanFrame* jframe);
     static bool can_tx(J1939Msg* msg);
     static void j1939_rx(J1939Msg* msg);
     // TODO: other callbacks

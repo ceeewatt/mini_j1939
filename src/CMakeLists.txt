@@ -1,14 +1,5 @@
 set(MINI_J1939_LIB mini_j1939_lib)
 
-option(
-    J1939_DISABLE_ADDRESS_CLAIM
-    "Disable the address claim procedure"
-    OFF)
-option(
-    J1939_DISABLE_TRANSPORT_PROTOCOL
-    "Disable the transport protocol procedure for sending messages with more than 8 bytes of payload"
-    OFF)
-
 set(SOURCES
     j1939.h
     j1939_define.h
@@ -47,14 +38,6 @@ target_compile_options(${MINI_J1939_LIB} PRIVATE
     -Wfatal-errors
 )
 
-if (${J1939_DISABLE_ADDRESS_CLAIM})
-    message(STATUS "[J1939] Disabling address claim")
-    list(REMOVE_ITEM SOURCES j1939_address_claim.c)
-    target_compile_definitions(${MINI_J1939_LIB} PRIVATE J1939_DISABLE_ADDRESS_CLAIM)
-endif()
-
-if (${J1939_DISABLE_TRANSPORT_PROTOCOL})
-    message(STATUS "[J1939] Disabling transport protocol")
-    list(REMOVE_ITEM SOURCES j1939_transport_protocol.c)
-    target_compile_definitions(${MINI_J1939_LIB} PRIVATE J1939_DISABLE_TRANSPORT_PROTOCOL)
+if (BUILD_TESTING)
+    target_compile_definitions(${MINI_J1939_LIB} PRIVATE UNIT_TEST)
 endif()

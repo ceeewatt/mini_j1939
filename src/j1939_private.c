@@ -1,40 +1,41 @@
 #include "j1939_private.h"
 
+#include <stddef.h>
+
 #ifndef J1939_NODES
 #error "Set J1939_NODES to the number of Controller Applications used"
 #endif
 
+// Remove static qualifier to make variable accessible from unit tests
+#ifdef UNIT_TEST
 struct J1939Private g_j1939[J1939_NODES];
+#else
+static struct J1939Private g_j1939[J1939_NODES];
+#endif
+
+/* ============================================================================
+ *
+ * Section: Static function prototypes
+ *
+ * ============================================================================
+ */
 
 static void
 dispatch(
     struct J1939* node,
-    struct J1939Msg* msg)
-{
-    struct J1939Private* jp = &g_j1939[node->node_idx];
+    struct J1939Msg* msg);
 
-    switch (msg->pgn)
-    {
-    case J1939_ADDRESS_CLAIMED_PGN:
-        j1939_ac_rx_address_claim(&jp->ac, msg);
-        break;
-    case J1939_TP_CM_PGN:
-    case J1939_TP_DT_PGN:
-        j1939_tp_dispatch(&jp->tp, msg);
-        break;
-    case J1939_REQUEST_PGN:
-        if (((struct J1939_REQUEST*)msg->data)->pgn == J1939_ADDRESS_CLAIMED_PGN)
-        {
-            j1939_ac_rx_address_claim_request(&jp->ac);
-            break;
-        }
-    // Fallthrough to application
-    __attribute__((fallthrough));
-    default:
-        node->j1939_rx(msg);
-        break;
-    }
-}
+/* ============================================================================
+ *
+ * Section: Function definitions
+ *
+ * ============================================================================
+ */
+
+/* ============================================================================
+ * Subsection: Public function definitions
+ * ============================================================================
+ */
 
 bool
 j1939_init(
@@ -52,6 +53,23 @@ j1939_init(
 
     if (next_idx >= J1939_NODES)
         return false;
+
+    if ((node == NULL) || (name == NULL))
+        return false;
+
+    if (preferred_address >= J1939_AC_MAX_ADDRESSES)
+        return false;
+
+    if (tick_rate_ms <= 0)
+        return false;
+
+    if ((startup_delay == NULL)  ||
+        (j1939_rx == NULL)       ||
+        (can_rx == NULL)         ||
+        (can_tx == NULL))
+    {
+        return false;
+    }
 
     node->node_idx = next_idx;
     g_j1939[next_idx].j1939_public = node;
@@ -110,7 +128,10 @@ j1939_tx(
     struct J1939* node,
     struct J1939Msg* msg)
 {
-    // TODO: address claim type
+    // TODO: address claim
+    if (g_j1939[node->node_idx].ac.cannot_claim_address)
+        return false;
+
     msg->src = node->source_address;
 
     if (msg->len > 8)
@@ -123,6 +144,11 @@ j1939_tx(
         return node->can_tx(msg);
     }
 }
+
+/* ============================================================================
+ * Subsection: Private function definitions
+ * ============================================================================
+ */
 
 bool
 j1939_can_id_converter(
@@ -149,7 +175,6 @@ j1939_can_id_converter(
     }
 }
 
-// Return true if the CAN frame was successfully copied into the j1939 msg
 bool
 j1939_can_frame_unpack(
     struct J1939* node,
@@ -232,4 +257,41 @@ j1939_close_transport_protocol_connection(
     int node_idx)
 {
     j1939_tp_close_connection(&g_j1939[node_idx].tp);
+}
+
+/* ============================================================================
+ *
+ * Section: Static function definitions
+ *
+ * ============================================================================
+ */
+
+static void
+dispatch(
+    struct J1939* node,
+    struct J1939Msg* msg)
+{
+    struct J1939Private* jp = &g_j1939[node->node_idx];
+
+    switch (msg->pgn)
+    {
+    case J1939_ADDRESS_CLAIMED_PGN:
+        j1939_ac_rx_address_claim(&jp->ac, msg);
+        break;
+    case J1939_TP_CM_PGN:
+    case J1939_TP_DT_PGN:
+        j1939_tp_dispatch(&jp->tp, msg);
+        break;
+    case J1939_REQUEST_PGN:
+        if (((struct J1939_REQUEST*)msg->data)->pgn == J1939_ADDRESS_CLAIMED_PGN)
+        {
+            j1939_ac_rx_address_claim_request(&jp->ac);
+            break;
+        }
+    // Fallthrough to application
+    __attribute__((fallthrough));
+    default:
+        node->j1939_rx(msg);
+        break;
+    }
 }

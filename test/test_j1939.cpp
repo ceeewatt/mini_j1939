@@ -1,5 +1,7 @@
 #include "test_j1939.hpp"
 
+#include <iostream>
+
 J1939 TestJ1939::node;
 uint8_t TestJ1939::msg_buf[J1939_TP_MAX_PAYLOAD];
 J1939Msg TestJ1939::msg { .data = TestJ1939::msg_buf };
@@ -19,6 +21,12 @@ void startup_delay_250ms(void* param)
 {
     (void)param;
     return;
+}
+
+bool TestJ1939::can_rx(J1939CanFrame* jframe)
+{
+    (void)jframe;
+    return false;
 }
 
 bool TestJ1939::can_tx(J1939Msg* msg)
@@ -46,16 +54,23 @@ void TestJ1939::j1939_rx(J1939Msg *msg)
 void TestJ1939::testRunStarting(Catch::TestRunInfo const& test_run_info)
 {
     const uint8_t preferred_address = 0x27;
-    (void)j1939_init(
-        &TestJ1939::node,
-        &TestJ1939::name,
-        preferred_address,
-        0,
-        NULL,
-        &TestJ1939::can_tx,
-        &TestJ1939::j1939_rx,
-        startup_delay_250ms,
-        nullptr);
+    const bool init_result =
+        j1939_init(
+            &TestJ1939::node,
+            &TestJ1939::name,
+            preferred_address,
+            10,
+            &TestJ1939::can_rx,
+            &TestJ1939::can_tx,
+            &TestJ1939::j1939_rx,
+            startup_delay_250ms,
+            nullptr);
+
+    if (!init_result)
+    {
+        std::cout << "testRunStarting(): init failure\n";
+        exit(1);
+    }
 }
 
 CATCH_REGISTER_LISTENER(TestJ1939)
