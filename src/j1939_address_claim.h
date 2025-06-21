@@ -1,5 +1,21 @@
 #pragma once
 
+/* ============================================================================
+ * File: j1939_address_claim.h
+ *
+ * Description: The address claim procedure allows for dynamic source address
+ *              assignment. The general procedure is: on startup, each node
+ *              sends out an ADDRESS_CLAIMED message, containing that node's
+ *              NAME. If two or more nodes try claiming the same address, the
+ *              node with a higher priority NAME get to keep theirs and the
+ *              other node must select a new address. If all nodes start out
+ *              with a unique address, there won't be any contention and thus
+ *              no nodes will need to change their default address. For the
+ *              procedure to work, each NODE in the network needs to have a
+ *              unique NAME.
+ * ============================================================================
+ */
+
 #include "j1939.h"
 
 #include <stdbool.h>
@@ -74,6 +90,7 @@ j1939_ac_init(
     J1939_AC_STARTUP_DELAY_250MS startup_delay,
     void* startup_delay_param);
 
+// Return true if a new address is claimed; false otherwise.
 bool
 j1939_ac_update_address(
     struct J1939AC* ac);

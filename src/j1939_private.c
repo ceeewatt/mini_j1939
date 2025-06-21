@@ -6,6 +6,10 @@
 #error "Set J1939_NODES to the number of Controller Applications used"
 #endif
 
+#ifdef J1939_LISTENER_ONLY_MODE
+#pragma message "Compiling with J1939_LISTENER_ONLY_MODE enabled... message transmission is disabled"
+#endif
+
 // Remove static qualifier to make variable accessible from unit tests
 #ifdef UNIT_TEST
 struct J1939Private g_j1939[J1939_NODES];
@@ -85,12 +89,16 @@ j1939_init(
         next_idx,
         tick_rate_ms);
 
+#ifndef J1939_LISTENER_ONLY_MODE
     j1939_ac_init(
         &g_j1939[next_idx].ac,
         next_idx,
         name,
         startup_delay,
         startup_delay_param);
+#else
+    (void)startup_delay_param;
+#endif
 
     next_idx++;
     return true;
@@ -117,10 +125,18 @@ j1939_update(
 
         // Ignore peer-to-peer messages not addressed to us
         if ((msg.dst != J1939_ADDR_GLOBAL) && (msg.dst != node->source_address))
+        {
+        #ifdef J1939_LISTENER_ONLY_MODE
+            node->j1939_rx(&msg);
+        #else
             continue;
+        #endif
+        }
 
         dispatch(node, &msg);
     }
+
+    j1939_tp_update(&g_j1939[node->node_idx].tp);
 }
 
 bool
@@ -128,7 +144,7 @@ j1939_tx(
     struct J1939* node,
     struct J1939Msg* msg)
 {
-    // TODO: address claim
+#ifndef J1939_LISTENER_ONLY_MODE
     if (g_j1939[node->node_idx].ac.cannot_claim_address)
         return false;
 
@@ -143,6 +159,10 @@ j1939_tx(
     {
         return node->can_tx(msg);
     }
+#else
+    (void)node, (void)msg;
+    return false;
+#endif
 }
 
 /* ============================================================================
@@ -275,12 +295,14 @@ dispatch(
 
     switch (msg->pgn)
     {
-    case J1939_ADDRESS_CLAIMED_PGN:
-        j1939_ac_rx_address_claim(&jp->ac, msg);
-        break;
     case J1939_TP_CM_PGN:
     case J1939_TP_DT_PGN:
         j1939_tp_dispatch(&jp->tp, msg);
+        break;
+
+#ifndef J1939_LISTENER_ONLY_MODE
+    case J1939_ADDRESS_CLAIMED_PGN:
+        j1939_ac_rx_address_claim(&jp->ac, msg);
         break;
     case J1939_REQUEST_PGN:
         if (((struct J1939_REQUEST*)msg->data)->pgn == J1939_ADDRESS_CLAIMED_PGN)
@@ -288,8 +310,10 @@ dispatch(
             j1939_ac_rx_address_claim_request(&jp->ac);
             break;
         }
+#endif
     // Fallthrough to application
     __attribute__((fallthrough));
+
     default:
         node->j1939_rx(msg);
         break;

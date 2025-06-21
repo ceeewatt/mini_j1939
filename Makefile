@@ -4,6 +4,7 @@ BUILD_DIR=build
 CMAKE_BUILD_TYPE=Debug
 J1939_DEMO=OFF
 UNIT_TEST=ON
+LISTENER_ONLY_MODE=OFF
 
 .PHONY: all configure clean
 
@@ -17,6 +18,7 @@ configure:
 		-DJ1939_NODES=${J1939_NODES} \
 		-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
 		-DJ1939_DEMO=${J1939_DEMO} \
+		-DJ1939_LISTENER_ONLY_MODE=${LISTENER_ONLY_MODE} \
 		-DBUILD_TESTING=${UNIT_TEST}
 	if [ ! -L compile_commands.json ]; then ln -s ${BUILD_DIR}/compile_commands.json .; fi
 

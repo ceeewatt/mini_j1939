@@ -8,6 +8,13 @@
  *              J1939 object for each unique node. The number of unique nodes
  *              operated by the application (ECU) should be defined by the
  *              J1939_NODES macro.
+ *              If this library is compiled with the J1939_LISTENER_ONLY_MODE
+ *              option enabled all nodes simply passively listen to the bus,
+ *              meaning that:
+ *              - Every extended CAN frame will be passed to application layer.
+ *              - Nodes will not participate in address claim.
+ *              - Message transmission is disallowed.
+ *              However, CAN 2.0A messages will still be discarded.
  * ============================================================================
  */
 
@@ -86,8 +93,8 @@ struct J1939 {
  * ============================================================================
  */
 
-// Initialize a device node before upon startup. This function should be called
-//  after the CAN bus is up and operational. If the node is initialized without
+// Initialize a device node upon startup. This function should be called after
+//  the CAN bus is up and operational. If the node is initialized without
 //  issue, return true. Otherwise, return false. It is undefined behvavior to
 //  attempt using a device node if that node was not initialized successfully.
 // The J1939Name parameter should be unique and not used by any other node on

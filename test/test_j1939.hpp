@@ -32,7 +32,6 @@ public:
     static bool can_rx(J1939CanFrame* jframe);
     static bool can_tx(J1939Msg* msg);
     static void j1939_rx(J1939Msg* msg);
-    // TODO: other callbacks
 
     using Catch::EventListenerBase::EventListenerBase;
 

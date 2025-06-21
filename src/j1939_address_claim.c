@@ -3,36 +3,27 @@
 
 #include <string.h>
 
+/* ============================================================================
+ *
+ * Section: Static function prototypes
+ *
+ * ============================================================================
+ */
+
 static void
 clear_address_table(
-    struct J1939AC* ac)
-{
-    uint8_t source_address = j1939_get_source_address(ac->node_idx);
-
-    memset(ac->address_table, 0, sizeof(ac->address_table));
-
-    if (source_address < J1939_AC_MAX_ADDRESSES)
-    {
-        ac->address_table[source_address] = 1;
-        ac->addresses_available = J1939_AC_MAX_ADDRESSES - 1;
-    }
-}
+    struct J1939AC* ac);
 
 static void
 cannot_claim_address(
-    struct J1939AC* ac)
-{
-    j1939_set_source_address(ac->node_idx, J1939_ADDR_NULL);
-    ac->cannot_claim_address = true;
+    struct J1939AC* ac);
 
-    j1939_tx_helper(
-        ac->node_idx,
-        J1939_CANNOT_CLAIM_ADDRESS_PGN,
-        (uint8_t*)&ac->name,
-        J1939_CANNOT_CLAIM_ADDRESS_LEN,
-        J1939_ADDR_GLOBAL,
-        J1939_CANNOT_CLAIM_ADDRESS_PRI);
-}
+/* ============================================================================
+ *
+ * Section: Function definitions
+ *
+ * ============================================================================
+ */
 
 void
 j1939_ac_init(
@@ -140,4 +131,42 @@ j1939_ac_rx_address_claim_request(
         J1939_ADDRESS_CLAIMED_LEN,
         J1939_ADDR_GLOBAL,
         J1939_ADDRESS_CLAIMED_PRI);
+}
+
+/* ============================================================================
+ *
+ * Section: Static function definitions
+ *
+ * ============================================================================
+ */
+
+static void
+clear_address_table(
+    struct J1939AC* ac)
+{
+    uint8_t source_address = j1939_get_source_address(ac->node_idx);
+
+    memset(ac->address_table, 0, sizeof(ac->address_table));
+
+    if (source_address < J1939_AC_MAX_ADDRESSES)
+    {
+        ac->address_table[source_address] = 1;
+        ac->addresses_available = J1939_AC_MAX_ADDRESSES - 1;
+    }
+}
+
+static void
+cannot_claim_address(
+    struct J1939AC* ac)
+{
+    j1939_set_source_address(ac->node_idx, J1939_ADDR_NULL);
+    ac->cannot_claim_address = true;
+
+    j1939_tx_helper(
+        ac->node_idx,
+        J1939_CANNOT_CLAIM_ADDRESS_PGN,
+        (uint8_t*)&ac->name,
+        J1939_CANNOT_CLAIM_ADDRESS_LEN,
+        J1939_ADDR_GLOBAL,
+        J1939_CANNOT_CLAIM_ADDRESS_PRI);
 }

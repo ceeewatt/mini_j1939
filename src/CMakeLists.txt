@@ -38,6 +38,10 @@ target_compile_options(${MINI_J1939_LIB} PRIVATE
     -Wfatal-errors
 )
 
+if (J1939_LISTENER_ONLY_MODE)
+    target_compile_definitions(${MINI_J1939_LIB} PRIVATE J1939_LISTENER_ONLY_MODE)
+endif()
+
 if (BUILD_TESTING)
     target_compile_definitions(${MINI_J1939_LIB} PRIVATE UNIT_TEST)
 endif()

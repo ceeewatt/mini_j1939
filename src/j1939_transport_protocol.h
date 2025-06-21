@@ -1,8 +1,53 @@
 #pragma once
 
+/* ============================================================================
+ * File: j1939_transport_protocol.h
+ *
+ * Description: The transport protocol (TP) procedure allows for transmission of
+ *              messages containing more than 8 bytes of payload. The standard
+ *              defines a sequence by which the data is transmitted in a series
+ *              of messages that each hold 8 bytes of data. When two or more
+ *              nodes enter into this sequence, it's a called an open connection.
+ *              There are two different types of connections. Broadcast
+ *              connections are opened when the multi-packet message is
+ *              addressed to the global address (255). Peer-to-peer (p2p)
+ *              connections are opened when the multi-packet message is
+ *              addressed to a single node. The transport protocol procedure
+ *              differs slightly depending on the type of connection. TP data
+ *              transfer and connection management are handled via the exchange
+ *              of TP.DT and TP.CM PGNs, respectively.
+ * ============================================================================
+ */
+
 #include "j1939.h"
 
 #include <stdint.h>
+
+/* ============================================================================
+ *
+ * Section: Macros
+ *
+ * ============================================================================
+ */
+
+#define J1939_TP_CM_CONTROL_BYTE_RTS  (16)
+#define J1939_TP_CM_CONTROL_BYTE_CTS  (17)
+#define J1939_TP_CM_CONTROL_BYTE_ACK  (19)
+#define J1939_TP_CM_CONTROL_BYTE_BAM  (32)
+#define J1939_TP_CM_CONTROL_BYTE_ABORT  (255)
+
+#define J1939_TP_TIMEOUT_TR  (200)
+#define J1939_TP_TIMEOUT_TH  (500)
+#define J1939_TP_TIMEOUT_T1  (750)
+#define J1939_TP_TIMEOUT_T2  (1250)
+#define J1939_TP_TIMEOUT_T3  (1250)
+#define J1939_TP_TIMEOUT_T4  (1050)
+
+// While a connection is open, transmit TP packets at this period (ms)
+#define J1939_TP_TX_PERIOD  (50)
+
+// No limit on the number of packages sent during a P2P connection
+#define J1939_TP_CM_RTS_MAX_PACKAGES  (0xFF)
 
 /* ============================================================================
  *
@@ -126,25 +171,6 @@ struct __attribute__((packed)) J1939_TP_CM_ABORT {
 #define J1939_TP_CM_PGN  (0x00EC00)
 #define J1939_TP_CM_LEN  (8)
 #define J1939_TP_CM_PRI  (7)
-
-#define J1939_TP_CM_CONTROL_BYTE_RTS  (16)
-#define J1939_TP_CM_CONTROL_BYTE_CTS  (17)
-#define J1939_TP_CM_CONTROL_BYTE_ACK  (19)
-#define J1939_TP_CM_CONTROL_BYTE_BAM  (32)
-#define J1939_TP_CM_CONTROL_BYTE_ABORT  (255)
-
-#define J1939_TP_TIMEOUT_TR  (200)
-#define J1939_TP_TIMEOUT_TH  (500)
-#define J1939_TP_TIMEOUT_T1  (750)
-#define J1939_TP_TIMEOUT_T2  (1250)
-#define J1939_TP_TIMEOUT_T3  (1250)
-#define J1939_TP_TIMEOUT_T4  (1050)
-
-// While a connection is open, transmit TP packets at this period (ms)
-#define J1939_TP_TX_PERIOD  (50)
-
-// No limit on the number of packages sent during a P2P connection
-#define J1939_TP_CM_RTS_MAX_PACKAGES  (0xFF)
 
 /* ============================================================================
  *
