@@ -178,6 +178,11 @@ j1939_can_frame_unpack(
     return true;
 }
 
+/* ============================================================================
+ * Subsection: helper functions for transport protocol and address claim
+ * ============================================================================
+ */
+
 void
 j1939_tx_helper(
     int node_idx,
@@ -197,4 +202,34 @@ j1939_tx_helper(
     };
 
     (void)j1939_tx(jp->j1939_public, &msg);
+}
+
+void
+j1939_rx_helper(
+    int node_idx,
+    struct J1939Msg* msg)
+{
+    g_j1939[node_idx].j1939_public->j1939_rx(msg);
+}
+
+void
+j1939_set_source_address(
+    int node_idx,
+    uint8_t new_address)
+{
+    g_j1939[node_idx].j1939_public->source_address = new_address;
+}
+
+uint8_t
+j1939_get_source_address(
+    int node_idx)
+{
+    return g_j1939[node_idx].j1939_public->source_address;
+}
+
+void
+j1939_close_transport_protocol_connection(
+    int node_idx)
+{
+    j1939_tp_close_connection(&g_j1939[node_idx].tp);
 }

@@ -8,11 +8,6 @@
  * ============================================================================
  */
 
-// Pass the fully received message to the application
-static void
-forward_msg(
-    struct J1939TP* tp);
-
 static void
 timeout(
     struct J1939TP* tp);
@@ -28,27 +23,6 @@ timeout(
  * Subsection: Sender/receiver helper functions
  * ============================================================================
  */
-
-void
-j1939_tp_tx(
-    struct J1939TP* tp,
-    uint32_t pgn,
-    uint8_t* data,
-    uint16_t len,
-    uint8_t dst,
-    uint8_t pri)
-{
-    struct J1939Private* jp = &g_j1939[tp->node_idx];
-    struct J1939Msg msg;
-
-    msg.pgn = pgn;
-    msg.data = data;
-    msg.len = len;
-    msg.dst = dst;
-    msg.pri = pri;
-
-    (void)j1939_tx(jp->j1939_public, &msg);
-}
 
 void
 j1939_tp_rx_abort(
@@ -89,8 +63,8 @@ j1939_tp_broadcast_update_sender(
         {
             struct J1939_TP_DT dt;
             j1939_tp_dt_pack(tp, &dt);
-            j1939_tp_tx(
-                tp,
+            j1939_tx_helper(
+                tp->node_idx,
                 J1939_TP_DT_PGN,
                 (uint8_t*)&dt,
                 J1939_TP_DT_LEN,
@@ -117,8 +91,8 @@ j1939_tp_p2p_update_sender(
             {
                 struct J1939_TP_DT dt;
                 j1939_tp_dt_pack(tp, &dt);
-                j1939_tp_tx(
-                    tp,
+                j1939_tx_helper(
+                    tp->node_idx,
                     J1939_TP_DT_PGN,
                     (uint8_t*)&dt,
                     J1939_TP_DT_LEN,
@@ -226,7 +200,7 @@ j1939_tp_broadcast_update_receiver(
     }
     else if (tp->bytes_rem == 0)
     {
-        forward_msg(tp);
+        j1939_rx_helper(tp->node_idx, &tp->msg_info);
         j1939_tp_close_connection(tp);
     }
 }
@@ -241,8 +215,8 @@ j1939_tp_p2p_update_receiver(
         {
             struct J1939_TP_CM_CTS cts;
             j1939_tp_cts_pack(tp, &cts);
-            j1939_tp_tx(
-                tp,
+            j1939_tx_helper(
+                tp->node_idx,
                 J1939_TP_CM_PGN,
                 (uint8_t*)&cts,
                 J1939_TP_CM_LEN,
@@ -262,15 +236,15 @@ j1939_tp_p2p_update_receiver(
         {
             struct J1939_TP_CM_ACK ack;
             j1939_tp_ack_pack(tp, &ack);
-            j1939_tp_tx(
-                tp,
+            j1939_tx_helper(
+                tp->node_idx,
                 J1939_TP_CM_PGN,
                 (uint8_t*)&ack,
                 J1939_TP_CM_LEN,
                 tp->msg_info.src,
                 J1939_TP_CM_PRI);
 
-            forward_msg(tp);
+            j1939_rx_helper(tp->node_idx, &tp->msg_info);
             j1939_tp_close_connection(tp);
         }
     }
@@ -304,8 +278,6 @@ j1939_tp_rx_rts(
     struct J1939_TP_CM_RTS* rts,
     uint8_t msg_src)
 {
-    struct J1939Private* jp = &g_j1939[tp->node_idx];
-
     tp->connection = J1939_TP_CONNECTION_P2P;
     tp->sender = false;
 
@@ -316,7 +288,7 @@ j1939_tp_rx_rts(
     tp->msg_info.pgn = rts->pgn;
     tp->msg_info.len = rts->len;
     tp->msg_info.src = msg_src;
-    tp->msg_info.dst = jp->j1939_public->source_address;
+    tp->msg_info.dst = j1939_get_source_address(tp->node_idx);
 
     // TODO: pgn lookup to determine priority
     tp->msg_info.pri = J1939_DEFAULT_PRIORITY;
@@ -378,23 +350,14 @@ j1939_tp_rx_bam(
  */
 
 static void
-forward_msg(
-    struct J1939TP* tp)
-{
-    struct J1939Private* jp = &g_j1939[tp->node_idx];
-
-    jp->j1939_public->j1939_rx(&tp->msg_info);
-}
-
-static void
 timeout(
     struct J1939TP* tp)
 {
     struct J1939_TP_CM_ABORT abort;
 
     j1939_tp_abort_pack(tp, &abort, J1939_TP_ABORT_REASON_TIMEOUT, tp->msg_info.pgn);
-    j1939_tp_tx(
-        tp,
+    j1939_tx_helper(
+        tp->node_idx,
         J1939_TP_CM_PGN,
         (uint8_t*)&abort,
         J1939_TP_CM_LEN,

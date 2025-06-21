@@ -1,4 +1,5 @@
 #include "j1939_transport_protocol_helper.h"
+#include "j1939_private.h"
 
 #include <string.h>
 
@@ -71,8 +72,8 @@ j1939_tp_queue(
 
         struct J1939_TP_CM_BAM bam;
         j1939_tp_bam_pack(tp, &bam);
-        j1939_tp_tx(
-            tp,
+        j1939_tx_helper(
+            tp->node_idx,
             J1939_TP_CM_PGN,
             (uint8_t*)&bam,
             J1939_TP_CM_LEN,
@@ -85,8 +86,8 @@ j1939_tp_queue(
 
         struct J1939_TP_CM_RTS rts;
         j1939_tp_rts_pack(tp, &rts);
-        j1939_tp_tx(
-            tp,
+        j1939_tx_helper(
+            tp->node_idx,
             J1939_TP_CM_PGN,
             (uint8_t*)&rts,
             J1939_TP_CM_LEN,
@@ -160,8 +161,8 @@ j1939_tp_dispatch(
                 &abort,
                 J1939_TP_ABORT_REASON_BUSY,
                 (uint32_t)msg->data[5]);
-            j1939_tp_tx(
-                tp,
+            j1939_tx_helper(
+                tp->node_idx,
                 J1939_TP_CM_PGN,
                 (uint8_t*)&abort,
                 J1939_TP_CM_LEN,
