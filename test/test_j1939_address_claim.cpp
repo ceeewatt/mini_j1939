@@ -50,7 +50,7 @@ TEST_CASE("New address search", "[j1939_ac_update_address]")
     g_j1939[TestJ1939::node.node_idx].j1939_public->source_address = original_address;
 }
 
-TEST_CASE("Recieving address claim", "[j1939_ac_rx_address_claim]")
+TEST_CASE("Receiving address claim", "[j1939_ac_rx_address_claim]")
 {
     J1939AC* ac = &g_j1939[TestJ1939::node.node_idx].ac;
     uint8_t original_address = g_j1939[TestJ1939::node.node_idx].j1939_public->source_address;
@@ -127,7 +127,8 @@ TEST_CASE("Recieving address claim", "[j1939_ac_rx_address_claim]")
         j1939_ac_rx_address_claim(ac, &received_msg);
 
         // Any open TP connections should be closed
-        REQUIRE(g_j1939[ac->node_idx].tp.connection == J1939_TP_CONNECTION_NONE);
+        REQUIRE(tp->connection == J1939_TP_CONNECTION_NONE);
+        REQUIRE(ac->cannot_claim_address == true);
 
         // We should send out an CANNOT CLAIM ADDRESS message and set our source
         //  address to 254.
@@ -137,6 +138,8 @@ TEST_CASE("Recieving address claim", "[j1939_ac_rx_address_claim]")
         REQUIRE(TestJ1939::msg.dst == J1939_ADDR_GLOBAL);
         REQUIRE(TestJ1939::msg.pri == J1939_CANNOT_CLAIM_ADDRESS_PRI);
         REQUIRE(std::memcmp(TestJ1939::msg.data, &TestJ1939::name, sizeof(J1939Name)) == 0);
+
+        ac->cannot_claim_address = false;
     }
 
     g_j1939[TestJ1939::node.node_idx].j1939_public->source_address = original_address;

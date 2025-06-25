@@ -169,7 +169,6 @@ cannot_claim_address(
     struct J1939AC* ac)
 {
     j1939_set_source_address(ac->node_idx, J1939_ADDR_NULL);
-    ac->cannot_claim_address = true;
 
     j1939_tx_helper(
         ac->node_idx,
@@ -178,4 +177,6 @@ cannot_claim_address(
         J1939_CANNOT_CLAIM_ADDRESS_LEN,
         J1939_ADDR_GLOBAL,
         J1939_CANNOT_CLAIM_ADDRESS_PRI);
+
+    ac->cannot_claim_address = true;
 }
