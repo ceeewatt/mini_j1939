@@ -37,25 +37,6 @@
  * ============================================================================
  */
 
-typedef struct J1939Name J1939_ADDRESS_CLAIMED;
-#define J1939_ADDRESS_CLAIMED_PGN  (0x00EE00)
-#define J1939_ADDRESS_CLAIMED_LEN  (8)
-#define J1939_ADDRESS_CLAIMED_PRI  (6)
-
-typedef J1939_ADDRESS_CLAIMED J1939_CANNOT_CLAIM_ADDRESS;
-#define J1939_CANNOT_CLAIM_ADDRESS_PGN  (J1939_ADDRESS_CLAIMED_PGN)
-#define J1939_CANNOT_CLAIM_ADDRESS_LEN  (J1939_ADDRESS_CLAIMED_LEN)
-#define J1939_CANNOT_CLAIM_ADDRESS_PRI  (J1939_ADDRESS_CLAIMED_PRI)
-
-// TODO: This is used to instruct a node with a given NAME to assume an address
-struct __attribute__((packed)) J1939_COMMANDED_ADDRESS {
-    struct J1939Name name;
-    uint8_t new_source_address;
-};
-#define J1939_COMMANDED_ADDRESS_PGN  (0x00FED8)
-#define J1939_COMMANDED_ADDRESS_LEN  (9)
-#define J1939_COMMANDED_ADDRESS_PRI  (6)
-
 struct J1939AC {
     // Used for indexing into the global J1939Private array
     int node_idx;
