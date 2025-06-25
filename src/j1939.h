@@ -84,6 +84,16 @@ struct J1939 {
 
     J1939_AC_STARTUP_DELAY_250MS startup_delay;
     void* startup_delay_param;
+
+    // CAN ID fields of the most recently processed CAN frame
+    struct CanIdConverter {
+        uint8_t pri;
+        uint8_t dp;
+        uint8_t pf;
+        uint8_t ps;
+        uint8_t sa;
+        uint32_t pgn;
+    } can_id_converter;
 };
 
 /* ============================================================================
@@ -126,6 +136,15 @@ bool
 j1939_tx(
     struct J1939* node,
     struct J1939Msg* msg);
+
+// Parses an extended (CAN2.0B) id and places the results in CanIdConverter.
+// Returns true if id represents a broadcast message.
+// Return false if id represents a destination-specific message, in which case
+//  the destination of the corresponding j1939 message is the ps field.
+bool
+j1939_can_id_converter(
+    struct CanIdConverter* converter,
+    uint32_t id);
 
 // Optional helper function for physical layer to derive CAN ID from J1939Msg
 uint32_t

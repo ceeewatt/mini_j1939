@@ -32,16 +32,6 @@ struct J1939Private {
     struct J1939TP tp;
 
     struct J1939AC ac;
-
-    // CAN ID fields of the most recently processed CAN frame
-    struct CanIdConverter {
-        uint8_t pri;
-        uint8_t dp;
-        uint8_t pf;
-        uint8_t ps;
-        uint8_t sa;
-        uint32_t pgn;
-    } can_id_converter;
 };
 
 /* ============================================================================
@@ -50,15 +40,6 @@ struct J1939Private {
  *
  * ============================================================================
  */
-
-// Returns true if the id represents a broadcast message
-// Otherwise, the id represents a destination-specific frame
-//  in which case, the destintation of the corresponding j1939 message is the
-//  'ps' field.
-bool
-j1939_can_id_converter(
-    struct CanIdConverter* converter,
-    uint32_t id);
 
 // Return false if the CAN frame is a standard frame (CAN 2.0A); true otherwise
 bool

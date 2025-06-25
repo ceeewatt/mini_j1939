@@ -164,30 +164,6 @@ j1939_tx(
 #endif
 }
 
-uint32_t
-j1939_msg_to_can_id(
-    struct J1939Msg* msg)
-{
-    uint8_t dp = (msg->pgn >> 16) & 0x01;
-    uint8_t pf = (msg->pgn >> 8) & 0xFF;
-    uint8_t ps = (pf < 240) ? msg->dst : (msg->pgn & 0xFF);
-
-    uint32_t can_id =
-        (1 << 31)         |
-        (msg->pri << 26)  |
-        (dp << 24)        |
-        (pf << 16)        |
-        (ps << 8)         |
-        msg->src;
-
-    return can_id;
-}
-
-/* ============================================================================
- * Subsection: Private function definitions
- * ============================================================================
- */
-
 bool
 j1939_can_id_converter(
     struct CanIdConverter* converter,
@@ -213,6 +189,30 @@ j1939_can_id_converter(
     }
 }
 
+uint32_t
+j1939_msg_to_can_id(
+    struct J1939Msg* msg)
+{
+    uint8_t dp = (msg->pgn >> 16) & 0x01;
+    uint8_t pf = (msg->pgn >> 8) & 0xFF;
+    uint8_t ps = (pf < 240) ? msg->dst : (msg->pgn & 0xFF);
+
+    uint32_t can_id =
+        (1 << 31)         |
+        (msg->pri << 26)  |
+        (dp << 24)        |
+        (pf << 16)        |
+        (ps << 8)         |
+        msg->src;
+
+    return can_id;
+}
+
+/* ============================================================================
+ * Subsection: Private function definitions
+ * ============================================================================
+ */
+
 bool
 j1939_can_frame_unpack(
     struct J1939* node,
@@ -223,16 +223,14 @@ j1939_can_frame_unpack(
     if (!((frame->id >> 31) & 1))
         return false;
 
-    struct J1939Private* jp = &g_j1939[node->node_idx];
-
-    if (j1939_can_id_converter(&jp->can_id_converter, frame->id))
+    if (j1939_can_id_converter(&node->can_id_converter, frame->id))
         msg->dst = J1939_ADDR_GLOBAL;
     else
-        msg->dst = jp->can_id_converter.ps;
+        msg->dst = node->can_id_converter.ps;
 
-    msg->pgn = jp->can_id_converter.pgn;
-    msg->src = jp->can_id_converter.sa;
-    msg->pri = jp->can_id_converter.pri;
+    msg->pgn = node->can_id_converter.pgn;
+    msg->src = node->can_id_converter.sa;
+    msg->pri = node->can_id_converter.pri;
     msg->len = frame->len;
 
     memcpy(msg->data, frame->data, frame->len);
