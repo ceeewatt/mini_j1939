@@ -149,4 +149,4 @@ j1939_can_id_converter(
 // Optional helper function for physical layer to derive CAN ID from J1939Msg
 uint32_t
 j1939_msg_to_can_id(
-    struct J1939Msg* msg);
+    const struct J1939Msg* msg);

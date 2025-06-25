@@ -191,7 +191,7 @@ j1939_can_id_converter(
 
 uint32_t
 j1939_msg_to_can_id(
-    struct J1939Msg* msg)
+    const struct J1939Msg* msg)
 {
     uint8_t dp = (msg->pgn >> 16) & 0x01;
     uint8_t pf = (msg->pgn >> 8) & 0xFF;
