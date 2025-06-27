@@ -17,7 +17,9 @@ int main(void)
         .arbitrary_addr_capable = 1
     };
 
-    node_init(&node, &name, src_addr);
+    if (!node_init(&node, &name, src_addr))
+        return -1;
+
     node_superloop(&node);
 
     return 0;
@@ -42,4 +44,9 @@ void node_tx_1hz(struct J1939* node)
     msg.pri = 7;
 
     j1939_tx(node, &msg);
+}
+
+void node_tx_oneshot(struct J1939* node)
+{
+    (void)node;
 }

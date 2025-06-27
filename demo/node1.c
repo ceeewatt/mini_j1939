@@ -17,28 +17,48 @@ int main(void)
         .arbitrary_addr_capable = 1
     };
 
-    node_init(&node, &name, src_addr);
-    node_superloop(&node);
+    if (!node_init(&node, &name, src_addr))
+        return -1;
+
+    node_superloop_oneshot(&node);
 
     return 0;
 }
 
 void node_tx_1hz(struct J1939* node)
 {
-    static int counter_1sec = 0;
+    struct test_long test;
+    struct J1939Msg msg;
 
-    struct dummy1 dummy = {
-        .a = ++counter_1sec,
-        .b = 0xBE,
-        .c = 0xEF
+    msg.pgn = TEST_LONG_PGN;
+    msg.data = (uint8_t*)&test;
+    msg.len = TEST_LONG_LEN;
+    msg.dst = 0xFF;
+    msg.pri = TEST_LONG_PRI;
+
+    j1939_tx(node, &msg);
+}
+
+void node_tx_oneshot(struct J1939* node)
+{
+    struct test_long test = {
+        .zero = 0x00,
+        .one = 0x11,
+        .two = 0x22,
+        .three = 0x33,
+        .four = 0x44,
+        .five = 0x55,
+        .six = 0x66,
+        .seven = 0x77,
+        .eight = 0x88
     };
     struct J1939Msg msg;
 
-    msg.pgn = DUMMY1_PGN;
-    msg.data = (uint8_t*)&dummy;
-    msg.len = sizeof(struct dummy1);
-    msg.dst = NODE2_SRC_ADDR;
-    msg.pri = 7;
+    msg.pgn = TEST_LONG_PGN;
+    msg.data = (uint8_t*)&test;
+    msg.len = TEST_LONG_LEN;
+    msg.dst = 0xFF;
+    msg.pri = TEST_LONG_PRI;
 
     j1939_tx(node, &msg);
 }

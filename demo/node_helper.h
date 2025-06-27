@@ -2,7 +2,23 @@
 
 #include <stdint.h>
 
-#define NODE1_SRC_ADDR  (0x55)
+struct __attribute__((packed)) test_long {
+    uint8_t zero : 8;
+    uint8_t one : 8;
+    uint8_t two : 8;
+    uint8_t three : 8;
+    uint8_t four : 8;
+    uint8_t five : 8;
+    uint8_t six : 8;
+    uint8_t seven : 8;
+    uint8_t eight : 8;
+};
+#define TEST_LONG_PGN  (0xFF04)
+#define TEST_LONG_LEN  (9)
+#define TEST_LONG_PRI  (3)
+
+
+#define NODE1_SRC_ADDR  (0x00)
 #define NODE2_SRC_ADDR  (0x56)
 
 #define NODE1_IDENTITY  (0x1)
@@ -36,6 +52,8 @@ struct __attribute__((packed)) dummy3 {
     uint8_t b8;
 };
 
-void node_init(struct J1939* node, struct J1939Name* name, uint8_t src_addr);
+bool node_init(struct J1939* node, struct J1939Name* name, uint8_t src_addr);
 void node_superloop(struct J1939* node);
+void node_superloop_oneshot(struct J1939* node);
 void node_tx_1hz(struct J1939* node);
+void node_tx_oneshot(struct J1939* node);
